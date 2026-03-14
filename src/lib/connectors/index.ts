@@ -21,6 +21,8 @@ import { webhookConnector } from './webhook';
 import { schedulerConnector } from './scheduler';
 import { dynamicHttpConnector } from './dynamic';
 import { priorityConnectorManifests } from './manifests';
+import { tier2Manifests } from './manifests/tier2';
+import { tier3Manifests } from './manifests/tier3';
 import gmailConnector from './implementations/gmail';
 import slackConnector from './implementations/slack';
 import stripeConnector from './implementations/stripe';
@@ -92,6 +94,12 @@ export function initializeBuiltInConnectors(): void {
   // Full implementations for each will be added incrementally
   // Users can still integrate with these apps via the dynamic HTTP connector
   registerConnectorManifests(priorityConnectorManifests);
+
+  // Tier 2: 100 additional connector manifests
+  registerConnectorManifests(tier2Manifests);
+
+  // Tier 3: 300 additional connector manifests (databases, cloud, social, AI, misc)
+  registerConnectorManifests(tier3Manifests);
 }
 
 /**
@@ -106,3 +114,5 @@ export { webhookConnector } from './webhook';
 export { schedulerConnector } from './scheduler';
 export { dynamicHttpConnector } from './dynamic';
 export { priorityConnectorManifests } from './manifests';
+export { tier2Manifests } from './manifests/tier2';
+export { tier3Manifests } from './manifests/tier3';
