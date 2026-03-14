@@ -3,9 +3,17 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
+import { ShieldCheck, CheckSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const NAV_ITEMS = [
+interface NavItem {
+  href: string;
+  label: string;
+  icon: string | React.ReactNode;
+  badge?: string;
+}
+
+const NAV_ITEMS: NavItem[] = [
   { href: '/workflows', label: 'Workflows', icon: '⚡' },
   { href: '/tables', label: 'Tables', icon: '📊' },
   { href: '/interfaces', label: 'Interfaces', icon: '📝' },
@@ -15,6 +23,9 @@ const NAV_ITEMS = [
   { href: '/transfer', label: 'Transfer', icon: '↔️' },
   { href: '/executions', label: 'Executions', icon: '📈' },
   { href: '/connections', label: 'Connections', icon: '🔗' },
+  { href: '/approvals', label: 'Approvals', icon: <CheckSquare size={18} />, badge: '4' },
+  { href: '/admin', label: 'Admin Center', icon: <ShieldCheck size={18} /> },
+  { href: '/mcp', label: 'MCP Servers', icon: '🖥️' },
   { href: '/settings', label: 'Settings', icon: '⚙️' },
 ];
 
@@ -76,7 +87,7 @@ export default function DashboardLayout({
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 py-4 px-3">
+        <nav className="flex-1 py-4 px-3 overflow-y-auto">
           {NAV_ITEMS.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
             return (
@@ -90,8 +101,15 @@ export default function DashboardLayout({
                     : 'text-sidebar-text hover:bg-sidebar-hover hover:text-white'
                 )}
               >
-                <span className="text-lg">{item.icon}</span>
-                {item.label}
+                <span className={typeof item.icon === 'string' ? 'text-lg' : 'flex-shrink-0'}>
+                  {item.icon}
+                </span>
+                <span className="flex-1">{item.label}</span>
+                {item.badge && (
+                  <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-orange-500 text-white text-xs font-bold">
+                    {item.badge}
+                  </span>
+                )}
               </Link>
             );
           })}
