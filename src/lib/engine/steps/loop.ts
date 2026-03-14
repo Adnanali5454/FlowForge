@@ -12,11 +12,10 @@ export interface LoopResult {
 }
 
 /**
- * Execute a loop step: resolve the source array, iterate up to maxIterations,
- * optionally break early based on a breakCondition expression.
- *
- * @param config      The LoopConfig from the step definition
- * @param inputData   The resolved input data for this step
+ * Utility function: resolves and slices the source array up to maxIterations.
+ * NOTE: This does NOT execute loopStepIds. The WorkflowExecutor handles
+ * full loop iteration including sub-step execution. Use this for
+ * standalone array resolution only.
  */
 export function executeLoop(
   config: LoopConfig,

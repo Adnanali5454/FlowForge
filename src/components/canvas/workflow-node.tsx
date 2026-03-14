@@ -4,6 +4,7 @@ import { memo } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
 import type { StepConfig, TriggerConfig, StepType } from '@/types';
 import { cn } from '@/lib/utils';
+import { useWorkflowStore } from '@/hooks/use-workflow-store';
 
 // ─── Step Type Visual Config ────────────────────────────────────────────────
 
@@ -129,12 +130,14 @@ export const StepNode = memo(function StepNode({ data, selected }: NodeProps) {
 // ─── Add Step Button Node ───────────────────────────────────────────────────
 
 export const AddStepNode = memo(function AddStepNode({ data }: NodeProps) {
-  const afterStepId = (data as { afterStepId: string }).afterStepId;
+  const afterStepId = (data as { afterStepId: string }).afterStepId ?? null;
+  const { openStepPicker } = useWorkflowStore();
 
   return (
     <div className="flex justify-center">
       <Handle type="target" position={Position.Top} className="!bg-transparent !border-0 !w-0 !h-0" />
       <button
+        onClick={() => openStepPicker(afterStepId)}
         className="w-8 h-8 rounded-full bg-gray-700 border border-gray-600 flex items-center justify-center text-gray-400 hover:bg-[#C9A227] hover:text-[#0C2340] hover:border-[#C9A227] transition-all"
         title="Add step"
       >

@@ -2,12 +2,14 @@
 // GET  /api/executions      — List executions for a workflow
 // POST /api/executions      — Trigger a manual workflow execution
 
+import '@/lib/startup';
 import { NextRequest, NextResponse } from 'next/server';
 import { db, schema } from '@/lib/db';
-import { eq, desc, and, sql } from 'drizzle-orm';
+import { eq, desc, and } from 'drizzle-orm';
 import { verifyToken, AUTH_COOKIE_NAME } from '@/lib/auth';
 import { WorkflowExecutor } from '@/lib/engine';
 import { logAudit, getClientIpAddress } from '@/lib/audit';
+import { incrementWorkspaceTaskCount } from '@/lib/billing';
 import type { WorkflowDefinition, TriggerConfig, StepConfig, WorkflowSettings, WorkflowVariable } from '@/types';
 
 /**
@@ -89,6 +91,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Workflow not found' }, { status: 404 });
     }
 
+    if (workflowRow.status === 'paused' || workflowRow.status === 'archived') {
+      return NextResponse.json(
+        { error: `Workflow is ${workflowRow.status} and cannot be executed` },
+        { status: 409 }
+      );
+    }
+
     // Build the WorkflowDefinition from DB row
     const workflow: WorkflowDefinition = {
       id: workflowRow.id,
@@ -153,40 +162,40 @@ export async function POST(request: NextRequest) {
         });
       },
       onStepComplete: async (step) => {
-        // Log step execution to DB with final status
-        await db.insert(schema.stepExecutions).values({
-          executionId: executionRow.id,
-          stepId: step.stepId,
-          stepIndex: step.stepIndex,
-          stepType: step.stepType,
-          stepName: step.stepName,
-          status: step.status,
-          inputData: step.inputData,
-          outputData: step.outputData,
-          error: step.error,
-          retryCount: step.retryCount,
-          startedAt: step.startedAt,
-          completedAt: step.completedAt,
-          durationMs: step.durationMs,
-        });
+        // UPDATE the existing row (inserted by onStepStart) with final status
+        await db.update(schema.stepExecutions)
+          .set({
+            status: step.status,
+            outputData: step.outputData ?? null,
+            error: step.error ?? null,
+            completedAt: step.completedAt ?? new Date(),
+            durationMs: step.durationMs ?? 0,
+            retryCount: step.retryCount ?? 0,
+          })
+          .where(
+            and(
+              eq(schema.stepExecutions.executionId, executionRow.id),
+              eq(schema.stepExecutions.stepId, step.stepId)
+            )
+          );
       },
       onStepError: async (step, _error) => {
-        // Log step error to DB
-        await db.insert(schema.stepExecutions).values({
-          executionId: executionRow.id,
-          stepId: step.stepId,
-          stepIndex: step.stepIndex,
-          stepType: step.stepType,
-          stepName: step.stepName,
-          status: step.status,
-          inputData: step.inputData,
-          outputData: step.outputData,
-          error: step.error,
-          retryCount: step.retryCount,
-          startedAt: step.startedAt,
-          completedAt: step.completedAt,
-          durationMs: step.durationMs,
-        });
+        // UPDATE the existing row (inserted by onStepStart) with error status
+        await db.update(schema.stepExecutions)
+          .set({
+            status: step.status,
+            outputData: step.outputData ?? null,
+            error: step.error ?? null,
+            completedAt: step.completedAt ?? new Date(),
+            durationMs: step.durationMs ?? 0,
+            retryCount: step.retryCount ?? 0,
+          })
+          .where(
+            and(
+              eq(schema.stepExecutions.executionId, executionRow.id),
+              eq(schema.stepExecutions.stepId, step.stepId)
+            )
+          );
       },
     });
 
@@ -207,36 +216,8 @@ export async function POST(request: NextRequest) {
       })
       .where(eq(schema.workflowExecutions.id, executionRow.id));
 
-    // Update workspace task count and check/reset task reset date
-    const workspace = await db
-      .select()
-      .from(schema.workspaces)
-      .where(eq(schema.workspaces.id, session.workspaceId));
-
-    if (workspace.length > 0) {
-      const ws = workspace[0];
-      const taskResetDate = ws.taskResetDate ? new Date(ws.taskResetDate) : null;
-      const now = new Date();
-      const currentMonth = now.toISOString().slice(0, 7); // YYYY-MM
-      const resetMonth = taskResetDate ? taskResetDate.toISOString().slice(0, 7) : null;
-
-      let newUsedTasks = (ws.usedTasksThisMonth || 0) + 1; // Increment by 1 (each execution = 1 task)
-      let newResetDate = taskResetDate;
-
-      // Reset if month has changed
-      if (!resetMonth || resetMonth !== currentMonth) {
-        newUsedTasks = 1;
-        newResetDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-      }
-
-      await db
-        .update(schema.workspaces)
-        .set({
-          usedTasksThisMonth: newUsedTasks,
-          taskResetDate: newResetDate,
-        })
-        .where(eq(schema.workspaces.id, session.workspaceId));
-    }
+    // Atomically increment workspace task count
+    await incrementWorkspaceTaskCount(session.workspaceId);
 
     return NextResponse.json({
       execution: {

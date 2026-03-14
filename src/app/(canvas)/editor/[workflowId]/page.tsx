@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useWorkflowStore } from '@/hooks/use-workflow-store';
@@ -199,8 +199,10 @@ export default function WorkflowEditorPage() {
   const { workflow, loadWorkflow } = useWorkflowStore();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const hasInitialized = useRef(false);
 
   useEffect(() => {
+    if (hasInitialized.current) return;
     const workflowId = params?.workflowId as string;
 
     if (!workflowId) {
@@ -230,6 +232,7 @@ export default function WorkflowEditorPage() {
 
           const data = await response.json();
           const newWorkflowId = data.workflow.id;
+          hasInitialized.current = true;
           router.push(`/editor/${newWorkflowId}`);
           return;
         }
@@ -246,12 +249,14 @@ export default function WorkflowEditorPage() {
 
         const data = await response.json();
         loadWorkflow(data.workflow);
+        hasInitialized.current = true;
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : 'An error occurred';
         setError(errorMsg);
         console.error('Error loading workflow:', err);
         // Use demo workflow as fallback
         loadWorkflow(createDemoWorkflow());
+        hasInitialized.current = true;
       } finally {
         setIsLoading(false);
       }
@@ -260,9 +265,10 @@ export default function WorkflowEditorPage() {
     if (!workflow) {
       initializeWorkflow();
     } else {
+      hasInitialized.current = true;
       setIsLoading(false);
     }
-  }, [params?.workflowId, workflow, loadWorkflow, router]);
+  }, [params?.workflowId, loadWorkflow, router]);
 
   return (
     <div className="h-screen w-full relative bg-canvas-bg">

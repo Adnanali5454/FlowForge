@@ -214,12 +214,10 @@ export const useWorkflowStore = create<WorkflowEditorState>((set, get) => ({
       steps.push(newStep);
     }
 
-    // Update Y positions
-    steps.forEach((step, i) => {
-      step.position = { x: 250, y: 200 + i * 150 };
-    });
+    // Update Y positions (immutable)
+    const repositioned = steps.map((step, i) => ({ ...step, position: { x: 250, y: 200 + i * 150 } }));
 
-    get().updateWorkflow({ steps });
+    get().updateWorkflow({ steps: repositioned });
     set({ selectedNodeId: newStep.id, sidebarPanel: 'step-config', stepPickerOpen: false });
   },
 
@@ -228,12 +226,10 @@ export const useWorkflowStore = create<WorkflowEditorState>((set, get) => ({
     const workflow = get().workflow;
     if (!workflow) return;
 
-    const steps = workflow.steps.filter((s) => s.id !== stepId);
-    steps.forEach((step, i) => {
-      step.position = { x: 250, y: 200 + i * 150 };
-    });
+    const filtered = workflow.steps.filter((s) => s.id !== stepId);
+    const repositioned = filtered.map((step, i) => ({ ...step, position: { x: 250, y: 200 + i * 150 } }));
 
-    get().updateWorkflow({ steps });
+    get().updateWorkflow({ steps: repositioned });
     set({ selectedNodeId: null, sidebarPanel: 'none' });
   },
 
@@ -337,17 +333,22 @@ export const useWorkflowStore = create<WorkflowEditorState>((set, get) => ({
       })),
     ];
 
-    // Build edges (linear for now — DAG support in Phase 2)
+    // Build edges using step.nextStepIds for DAG support
     const edges: CanvasEdge[] = [];
-    const allIds = [workflow.trigger.id, ...workflow.steps.map((s) => s.id)];
-    for (let i = 0; i < allIds.length - 1; i++) {
-      edges.push({
-        id: `edge-${allIds[i]}-${allIds[i + 1]}`,
-        source: allIds[i],
-        target: allIds[i + 1],
-        animated: false,
-      });
+    const firstStep = workflow.steps[0];
+    if (firstStep) {
+      edges.push({ id: `edge-${workflow.trigger.id}-${firstStep.id}`, source: workflow.trigger.id, target: firstStep.id, animated: false });
     }
+    workflow.steps.forEach((step, i) => {
+      if (step.nextStepIds && step.nextStepIds.length > 0) {
+        step.nextStepIds.forEach(targetId => {
+          edges.push({ id: `edge-${step.id}-${targetId}`, source: step.id, target: targetId, animated: false });
+        });
+      } else if (i < workflow.steps.length - 1) {
+        const nextStep = workflow.steps[i + 1];
+        edges.push({ id: `edge-${step.id}-${nextStep.id}`, source: step.id, target: nextStep.id, animated: false });
+      }
+    });
 
     set({ nodes, edges });
   },

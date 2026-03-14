@@ -1,4 +1,6 @@
 export { executeFilter, type FilterResult } from './filter';
+// Note: executeLoop from steps/loop.ts provides array slicing utility only.
+// Full loop execution with sub-step iteration is handled by WorkflowExecutor.executeLoop()
 export { executeLoop, type LoopResult } from './loop';
 export { executeFormatter, type FormatterResult } from './formatter';
 export { executeDelay, calculateDelay, type DelayResult } from './delay';

@@ -4,10 +4,12 @@
 // DELETE /api/connections       — Delete a connection
 // POST   /api/connections/test  — Test a connection
 
+import '@/lib/startup';
 import { NextRequest, NextResponse } from 'next/server';
 import { db, schema } from '@/lib/db';
 import { eq, and } from 'drizzle-orm';
 import { verifyToken, AUTH_COOKIE_NAME } from '@/lib/auth';
+import { getAllConnectorManifests } from '@/lib/connectors';
 
 /**
  * GET /api/connections — List connections for workspace
@@ -70,14 +72,57 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    // Connectors live in the in-memory registry; no DB lookup needed
+
+    // connectorId may be a slug (e.g. "github") or a UUID.
+    // appConnections.connectorId is a UUID FK to connectorRegistry.id,
+    // so we must resolve the slug to a registry UUID, upserting if needed.
+    const slugToLookup = connectorId;
+    let [registryRow] = await db
+      .select({ id: schema.connectorRegistry.id })
+      .from(schema.connectorRegistry)
+      .where(eq(schema.connectorRegistry.slug, slugToLookup));
+
+    if (!registryRow) {
+      // Connector exists in in-memory registry but not yet in DB — upsert it
+      const manifests = getAllConnectorManifests();
+      const manifest = manifests.find((m) => m.slug === slugToLookup || m.id === slugToLookup);
+      if (!manifest) {
+        return NextResponse.json(
+          { error: `Connector '${slugToLookup}' not found` },
+          { status: 404 }
+        );
+      }
+      const [inserted] = await db
+        .insert(schema.connectorRegistry)
+        .values({
+          slug: manifest.slug,
+          name: manifest.name,
+          description: manifest.description ?? '',
+          icon: manifest.icon ?? '',
+          category: manifest.category,
+          authType: manifest.authType as 'oauth2' | 'api_key' | 'basic' | 'bearer' | 'custom',
+          triggers: manifest.triggers,
+          actions: manifest.actions,
+          version: manifest.version ?? '1.0.0',
+          isBuiltIn: manifest.isBuiltIn ?? true,
+          isPremium: manifest.isPremium ?? false,
+        })
+        .onConflictDoUpdate({
+          target: schema.connectorRegistry.slug,
+          set: { name: manifest.name, updatedAt: new Date() },
+        })
+        .returning({ id: schema.connectorRegistry.id });
+      registryRow = inserted;
+    }
+
+    const resolvedConnectorId = registryRow.id;
 
     // Store credentials (in production, these should be encrypted)
     const [connection] = await db
       .insert(schema.appConnections)
       .values({
         workspaceId: session.workspaceId,
-        connectorId,
+        connectorId: resolvedConnectorId,
         name: name.trim(),
         credentials,
         isValid: true,

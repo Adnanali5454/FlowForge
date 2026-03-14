@@ -1516,6 +1516,16 @@ export default function StepConfigPanel() {
     removeStep,
   } = useWorkflowStore();
 
+  const stepOutputs: Record<string, string[]> = {
+    trigger: Object.keys(workflow?.trigger?.outputSchema?.properties ?? {}),
+    ...Object.fromEntries(
+      (workflow?.steps ?? []).map(s => [
+        s.id,
+        Object.keys(s.outputSchema?.properties ?? {})
+      ])
+    ),
+  };
+
   const isOpen = sidebarPanel === 'step-config' && selectedNodeId !== null;
 
   // Find selected node data

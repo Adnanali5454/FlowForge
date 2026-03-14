@@ -38,7 +38,7 @@ const anthropicConnector: ConnectorPlugin = {
 
   async executeAction(actionKey, credentials, params): Promise<ActionResult> {
     if (actionKey === 'send_message') {
-      const { prompt, systemPrompt, model = 'claude-sonnet-4-5-20250514', maxTokens = 2048 } = params as { prompt: string; systemPrompt?: string; model?: string; maxTokens?: number };
+      const { prompt, systemPrompt, model = 'claude-sonnet-4-6', maxTokens = 2048 } = params as { prompt: string; systemPrompt?: string; model?: string; maxTokens?: number };
 
       const body: Record<string, unknown> = {
         model,

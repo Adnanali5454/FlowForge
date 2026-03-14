@@ -7,10 +7,11 @@ import { eq, and } from 'drizzle-orm';
 // ─── Encryption config ───────────────────────────────────────────────────────
 
 const ALGORITHM = 'aes-256-gcm';
-const KEY = Buffer.from(
-  process.env.ENCRYPTION_KEY || 'default-32-byte-key-for-dev-only!',
-  'utf8'
-).slice(0, 32);
+const KEY = (() => {
+  const k = process.env.ENCRYPTION_KEY;
+  if (!k) throw new Error('ENCRYPTION_KEY environment variable is required');
+  return Buffer.from(k, 'utf8').slice(0, 32);
+})();
 
 // ─── encryptCredentials ──────────────────────────────────────────────────────
 // Encrypts a credentials object to a base64 string using AES-256-GCM.

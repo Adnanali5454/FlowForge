@@ -15,8 +15,11 @@ import ReactFlow, {
   BackgroundVariant,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { nodeTypes } from './workflow-node';
+import { nodeTypes as importedNodeTypes } from './workflow-node';
 import { useWorkflowStore, type CanvasNode, type CanvasEdge } from '@/hooks/use-workflow-store';
+
+// Must be defined at module scope to remain stable across renders
+const STABLE_NODE_TYPES = importedNodeTypes;
 
 export default function WorkflowCanvas() {
   const {
@@ -93,11 +96,11 @@ export default function WorkflowCanvas() {
   }, [openStepPicker]);
 
   return (
-    <div className="w-full h-full">
+    <div className="w-full h-full" onDoubleClick={onPaneDoubleClick}>
       <ReactFlow
         nodes={rfNodes}
         edges={rfEdges}
-        nodeTypes={nodeTypes}
+        nodeTypes={STABLE_NODE_TYPES}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}

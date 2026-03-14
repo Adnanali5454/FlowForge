@@ -11,14 +11,14 @@ interface Chatbot {
   createdAt: string;
 }
 
-const MODELS = ['claude-sonnet', 'claude-opus', 'gpt-4o', 'gpt-4o-mini', 'gemini-pro'];
+const MODELS = ['claude-sonnet-4-6', 'claude-opus-4-6', 'gpt-4o', 'gpt-4o-mini', 'gemini-pro'];
 
 export default function ChatbotsPage() {
   const [chatbots, setChatbots] = useState<Chatbot[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
-  const [newModel, setNewModel] = useState('claude-sonnet');
+  const [newModel, setNewModel] = useState('claude-sonnet-4-6');
 
   useEffect(() => {
     fetch('/api/chatbots').then(r => r.json()).then(d => setChatbots(d.chatbots ?? [])).finally(() => setIsLoading(false));

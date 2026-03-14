@@ -127,7 +127,7 @@ export default function AgentEditPage() {
               <label className="text-xs text-gray-400 mb-1 block">Model</label>
               <select value={agent.model} onChange={e => setAgent(prev => prev ? { ...prev, model: e.target.value } : prev)}
                 className="w-full px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-[#C9A227]">
-                {['claude-sonnet', 'claude-opus', 'gpt-4o'].map(m => <option key={m} value={m}>{m}</option>)}
+                {['claude-sonnet-4-6', 'claude-opus-4-6', 'gpt-4o'].map(m => <option key={m} value={m}>{m}</option>)}
               </select>
             </div>
             <div>

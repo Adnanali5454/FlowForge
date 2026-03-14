@@ -13,7 +13,7 @@ interface Agent {
 }
 
 const AGENT_TYPES = ['task', 'research', 'assistant', 'monitor', 'orchestrator'];
-const MODELS = ['claude-sonnet', 'claude-opus', 'gpt-4o'];
+const MODELS = ['claude-sonnet-4-6', 'claude-opus-4-6', 'gpt-4o'];
 
 export default function AgentsPage() {
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -21,7 +21,7 @@ export default function AgentsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
   const [newType, setNewType] = useState('task');
-  const [newModel, setNewModel] = useState('claude-sonnet');
+  const [newModel, setNewModel] = useState('claude-sonnet-4-6');
 
   useEffect(() => {
     fetch('/api/agents').then(r => r.json()).then(d => setAgents(d.agents ?? [])).finally(() => setIsLoading(false));

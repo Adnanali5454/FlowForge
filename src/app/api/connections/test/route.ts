@@ -1,6 +1,7 @@
 // ─── Test Connection Endpoint ───────────────────────────────────────────────
 // POST /api/connections/test — Test a connection
 
+import '@/lib/startup';
 import { NextRequest, NextResponse } from 'next/server';
 import { db, schema } from '@/lib/db';
 import { eq, and } from 'drizzle-orm';

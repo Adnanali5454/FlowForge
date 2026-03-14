@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
         workspaceId: session.workspaceId,
         name: body.name || 'My Chatbot',
         description: body.description || '',
-        model: body.model || 'claude-sonnet',
+        model: body.model || 'claude-sonnet-4-6',
         systemPrompt: body.systemPrompt || 'You are a helpful assistant.',
         welcomeMessage: body.welcomeMessage || 'Hello! How can I help you today?',
         createdBy: session.userId,

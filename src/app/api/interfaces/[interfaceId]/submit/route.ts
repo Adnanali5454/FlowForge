@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, schema } from '@/lib/db';
+import { eq } from 'drizzle-orm';
 
 export async function POST(request: NextRequest, { params }: { params: { interfaceId: string } }) {
   try {
     const body = await request.json();
+
+    const [iface] = await db.select()
+      .from(schema.flowforgeInterfaces)
+      .where(eq(schema.flowforgeInterfaces.id, params.interfaceId));
+    if (!iface) return NextResponse.json({ error: 'Form not found' }, { status: 404 });
+    if (!iface.isPublished) return NextResponse.json({ error: 'This form is not currently accepting submissions' }, { status: 403 });
+
     const [submission] = await db
       .insert(schema.flowforgeInterfaceSubmissions)
       .values({

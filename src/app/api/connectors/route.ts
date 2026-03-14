@@ -3,11 +3,9 @@
 // Query params:
 //   - category: Filter by category (communication, crm, productivity, etc.)
 
+import '@/lib/startup';
 import { NextRequest, NextResponse } from 'next/server';
-import { getAllConnectorManifests, initializeBuiltInConnectors } from '@/lib/connectors';
-
-// Initialize connectors on module load
-initializeBuiltInConnectors();
+import { getAllConnectorManifests } from '@/lib/connectors';
 
 /**
  * GET /api/connectors — List all available connectors

@@ -1,15 +1,19 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useWorkflowStore } from '@/hooks/use-workflow-store';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 export default function EditorToolbar() {
+  const router = useRouter();
   const {
     workflow,
     isDirty,
     isSaving,
+    setDirty,
+    setSaving,
     undo,
     redo,
     undoStack,
@@ -20,6 +24,33 @@ export default function EditorToolbar() {
   const [isPublishing, setIsPublishing] = useState(false);
 
   if (!workflow) return null;
+
+  const handleSave = async () => {
+    if (!workflow || !isDirty) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/workflows/${workflow.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: workflow.name,
+          description: workflow.description,
+          trigger: workflow.trigger,
+          steps: workflow.steps,
+          variables: workflow.variables,
+          settings: workflow.settings,
+          tags: workflow.tags,
+        }),
+      });
+      if (!res.ok) throw new Error('Save failed');
+      setDirty(false);
+      toast.success('Workflow saved');
+    } catch {
+      toast.error('Failed to save workflow');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleTestRun = async () => {
     try {
@@ -52,6 +83,7 @@ export default function EditorToolbar() {
   const handlePublish = async () => {
     try {
       setIsPublishing(true);
+      await handleSave();
       const response = await fetch(`/api/workflows/${workflow.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -79,7 +111,15 @@ export default function EditorToolbar() {
     <div className="absolute top-0 left-0 right-0 z-10 h-14 bg-sidebar-bg/90 backdrop-blur-sm border-b border-gray-800 flex items-center justify-between px-4">
       {/* Left: Workflow info */}
       <div className="flex items-center gap-3">
-        <button className="text-gray-400 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-gray-800">
+        <button
+          onClick={() => {
+            if (isDirty) {
+              if (!confirm('You have unsaved changes. Leave without saving?')) return;
+            }
+            router.push('/workflows');
+          }}
+          className="text-gray-400 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-gray-800"
+        >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M19 12H5M12 19l-7-7 7-7" />
           </svg>
@@ -138,6 +178,15 @@ export default function EditorToolbar() {
         </button>
 
         <div className="h-6 w-px bg-gray-700 mx-1" />
+
+        {/* Save */}
+        <button
+          onClick={handleSave}
+          disabled={!isDirty || isSaving}
+          className="px-4 py-1.5 text-sm bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {isSaving ? 'Saving...' : 'Save'}
+        </button>
 
         {/* Test Run */}
         <button

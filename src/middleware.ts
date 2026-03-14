@@ -36,9 +36,12 @@ export async function middleware(request: NextRequest) {
 
   // Verify token
   try {
-    const secret = new TextEncoder().encode(
-      process.env.JWT_SECRET || 'fallback-dev-secret'
-    );
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      const loginUrl = new URL('/login', request.url);
+      return NextResponse.redirect(loginUrl);
+    }
+    const secret = new TextEncoder().encode(jwtSecret);
     await jwtVerify(token, secret);
     return NextResponse.next();
   } catch {

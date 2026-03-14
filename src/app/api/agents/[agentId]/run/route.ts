@@ -1,3 +1,4 @@
+import '@/lib/startup';
 import { NextRequest, NextResponse } from 'next/server';
 import { db, schema } from '@/lib/db';
 import { eq } from 'drizzle-orm';
@@ -14,7 +15,9 @@ export async function POST(request: NextRequest, { params }: { params: { agentId
     const { goal, context } = body as { goal: string; context?: Record<string, unknown> };
 
     const [agent] = await db.select().from(schema.flowforgeAgents).where(eq(schema.flowforgeAgents.id, params.agentId));
-    if (!agent) return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
+    if (!agent || agent.workspaceId !== session.workspaceId) {
+      return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
+    }
 
     // Create run record
     const [run] = await db

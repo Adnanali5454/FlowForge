@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
         name: body.name || 'My Agent',
         description: body.description || '',
         type: body.type || 'task',
-        model: body.model || 'claude-sonnet',
+        model: body.model || 'claude-sonnet-4-6',
         systemPrompt: body.systemPrompt || '',
         createdBy: session.userId,
       })
