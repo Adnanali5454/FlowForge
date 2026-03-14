@@ -397,7 +397,7 @@ export interface ConnectorManifest {
   icon: string;
   category: ConnectorCategory;
   authType: ConnectorAuthType;
-  authConfig: OAuthConfig | ApiKeyConfig | BasicAuthConfig | CustomAuthConfig;
+  authConfig: OAuthConfig | ApiKeyConfig | BasicAuthConfig | BearerConfig | CustomAuthConfig;
   triggers: ConnectorTriggerDef[];
   actions: ConnectorActionDef[];
   version: string;
@@ -475,6 +475,11 @@ export interface BasicAuthConfig {
   type: 'basic';
   usernameField: string;
   passwordField: string;
+}
+
+export interface BearerConfig {
+  type: 'bearer';
+  headerName?: string;
 }
 
 export interface CustomAuthConfig {
