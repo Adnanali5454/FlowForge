@@ -1,7 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import { useWorkflowStore } from '@/hooks/use-workflow-store';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 export default function EditorToolbar() {
   const {
@@ -14,8 +16,64 @@ export default function EditorToolbar() {
     redoStack,
     openStepPicker,
   } = useWorkflowStore();
+  const [isTestRunning, setIsTestRunning] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   if (!workflow) return null;
+
+  const handleTestRun = async () => {
+    try {
+      setIsTestRunning(true);
+      const response = await fetch('/api/executions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workflowId: workflow.id,
+          triggerData: {},
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to run workflow');
+      }
+
+      const data = await response.json();
+      toast.success(`Execution started: ${data.execution?.id || 'unknown'}`);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Failed to run test';
+      toast.error(errorMsg);
+      console.error('Test run error:', error);
+    } finally {
+      setIsTestRunning(false);
+    }
+  };
+
+  const handlePublish = async () => {
+    try {
+      setIsPublishing(true);
+      const response = await fetch(`/api/workflows/${workflow.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'active',
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to publish workflow');
+      }
+
+      toast.success('Workflow published successfully');
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Failed to publish workflow';
+      toast.error(errorMsg);
+      console.error('Publish error:', error);
+    } finally {
+      setIsPublishing(false);
+    }
+  };
 
   return (
     <div className="absolute top-0 left-0 right-0 z-10 h-14 bg-sidebar-bg/90 backdrop-blur-sm border-b border-gray-800 flex items-center justify-between px-4">
@@ -82,13 +140,21 @@ export default function EditorToolbar() {
         <div className="h-6 w-px bg-gray-700 mx-1" />
 
         {/* Test Run */}
-        <button className="px-4 py-1.5 text-sm bg-gray-800 text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors">
-          Test Run
+        <button
+          onClick={handleTestRun}
+          disabled={isTestRunning}
+          className="px-4 py-1.5 text-sm bg-gray-800 text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isTestRunning ? 'Running...' : 'Test Run'}
         </button>
 
         {/* Publish */}
-        <button className="px-4 py-1.5 text-sm bg-[#C9A227] text-[#0C2340] font-semibold rounded-lg hover:bg-[#D4AF37] transition-colors">
-          {isSaving ? 'Saving...' : 'Publish'}
+        <button
+          onClick={handlePublish}
+          disabled={isPublishing || isSaving}
+          className="px-4 py-1.5 text-sm bg-[#C9A227] text-[#0C2340] font-semibold rounded-lg hover:bg-[#D4AF37] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isPublishing || isSaving ? 'Saving...' : 'Publish'}
         </button>
       </div>
     </div>

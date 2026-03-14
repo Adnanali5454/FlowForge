@@ -1,15 +1,19 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import type { ExecutionStatus } from '@/types';
 import { cn, formatDuration, timeAgo } from '@/lib/utils';
 
-const MOCK_EXECUTIONS = [
-  { id: 'ex_001', workflowName: 'New Lead → Slack + CRM', status: 'success' as ExecutionStatus, steps: 4, duration: 2340, startedAt: new Date(Date.now() - 600000) },
-  { id: 'ex_002', workflowName: 'New Lead → Slack + CRM', status: 'success' as ExecutionStatus, steps: 4, duration: 1890, startedAt: new Date(Date.now() - 1200000) },
-  { id: 'ex_003', workflowName: 'Daily Report Generator', status: 'success' as ExecutionStatus, steps: 6, duration: 14500, startedAt: new Date(Date.now() - 7200000) },
-  { id: 'ex_004', workflowName: 'Invoice Processing', status: 'error' as ExecutionStatus, steps: 3, duration: 5200, startedAt: new Date(Date.now() - 14400000), error: 'API rate limit exceeded' },
-  { id: 'ex_005', workflowName: 'New Lead → Slack + CRM', status: 'running' as ExecutionStatus, steps: 2, duration: 0, startedAt: new Date() },
-];
+interface Execution {
+  id: string;
+  workflowId: string;
+  status: ExecutionStatus;
+  stepsExecuted: number;
+  stepsTotal: number;
+  durationMs: number | null;
+  startedAt: string;
+  error: string | null;
+}
 
 const STATUS_CONFIG: Record<ExecutionStatus, { label: string; color: string; bg: string }> = {
   pending: { label: 'Pending', color: 'text-gray-400', bg: 'bg-gray-500/10' },
@@ -22,6 +26,34 @@ const STATUS_CONFIG: Record<ExecutionStatus, { label: string; color: string; bg:
 };
 
 export default function ExecutionsPage() {
+  const [executions, setExecutions] = useState<Execution[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchExecutions = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const response = await fetch('/api/executions');
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch executions');
+        }
+
+        const data = await response.json();
+        setExecutions(data.executions || []);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An error occurred');
+        console.error('Error fetching executions:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchExecutions();
+  }, []);
+
   return (
     <div className="p-8">
       <div className="mb-8">
@@ -31,12 +63,19 @@ export default function ExecutionsPage() {
         </p>
       </div>
 
+      {/* Error State */}
+      {error && (
+        <div className="glass rounded-xl p-4 border border-red-500/50 bg-red-500/10 mb-6">
+          <p className="text-red-400 text-sm">{error}</p>
+        </div>
+      )}
+
       {/* Execution Table */}
       <div className="glass rounded-xl overflow-hidden">
         <table className="w-full">
           <thead>
             <tr className="border-b border-gray-700">
-              <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Workflow</th>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Workflow ID</th>
               <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
               <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Steps</th>
               <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Duration</th>
@@ -44,30 +83,59 @@ export default function ExecutionsPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-800">
-            {MOCK_EXECUTIONS.map((exec) => {
-              const statusConf = STATUS_CONFIG[exec.status];
-              return (
-                <tr key={exec.id} className="hover:bg-gray-800/30 transition-colors cursor-pointer">
+            {isLoading ? (
+              [...Array(5)].map((_, i) => (
+                <tr key={i} className="animate-pulse">
                   <td className="px-5 py-4">
-                    <p className="text-sm font-medium text-white">{exec.workflowName}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{exec.id}</p>
+                    <div className="h-3 bg-gray-700 rounded w-24" />
                   </td>
                   <td className="px-5 py-4">
-                    <span className={cn('inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium', statusConf.bg, statusConf.color)}>
-                      {exec.status === 'running' && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
-                      )}
-                      {statusConf.label}
-                    </span>
+                    <div className="h-3 bg-gray-700 rounded w-20" />
                   </td>
-                  <td className="px-5 py-4 text-sm text-gray-300">{exec.steps}</td>
-                  <td className="px-5 py-4 text-sm text-gray-300 font-mono">
-                    {exec.duration > 0 ? formatDuration(exec.duration) : '—'}
+                  <td className="px-5 py-4">
+                    <div className="h-3 bg-gray-700 rounded w-12" />
                   </td>
-                  <td className="px-5 py-4 text-sm text-gray-400">{timeAgo(exec.startedAt)}</td>
+                  <td className="px-5 py-4">
+                    <div className="h-3 bg-gray-700 rounded w-16" />
+                  </td>
+                  <td className="px-5 py-4">
+                    <div className="h-3 bg-gray-700 rounded w-20" />
+                  </td>
                 </tr>
-              );
-            })}
+              ))
+            ) : executions.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-5 py-12 text-center text-gray-500">
+                  <p className="text-sm font-medium mb-1">No executions yet</p>
+                  <p className="text-xs">Run a workflow to see execution history</p>
+                </td>
+              </tr>
+            ) : (
+              executions.map((exec) => {
+                const statusConf = STATUS_CONFIG[exec.status];
+                return (
+                  <tr key={exec.id} className="hover:bg-gray-800/30 transition-colors cursor-pointer">
+                    <td className="px-5 py-4">
+                      <p className="text-sm font-medium text-white">{exec.workflowId}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{exec.id}</p>
+                    </td>
+                    <td className="px-5 py-4">
+                      <span className={cn('inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium', statusConf.bg, statusConf.color)}>
+                        {exec.status === 'running' && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+                        )}
+                        {statusConf.label}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 text-sm text-gray-300">{exec.stepsExecuted}/{exec.stepsTotal}</td>
+                    <td className="px-5 py-4 text-sm text-gray-300 font-mono">
+                      {exec.durationMs ? formatDuration(exec.durationMs) : '—'}
+                    </td>
+                    <td className="px-5 py-4 text-sm text-gray-400">{timeAgo(new Date(exec.startedAt))}</td>
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
       </div>

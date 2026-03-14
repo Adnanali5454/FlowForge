@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
@@ -11,12 +12,38 @@ const NAV_ITEMS = [
   { href: '/settings', label: 'Settings', icon: '⚙️' },
 ];
 
+interface WorkspaceInfo {
+  usedTasksThisMonth: number;
+  tasksLimit: number;
+}
+
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const [workspaceInfo, setWorkspaceInfo] = useState<WorkspaceInfo>({
+    usedTasksThisMonth: 0,
+    tasksLimit: 500,
+  });
+
+  useEffect(() => {
+    // TODO: Create /api/workspace endpoint to fetch workspace info
+    // For now, we'll use hardcoded values
+    // const fetchWorkspaceInfo = async () => {
+    //   try {
+    //     const response = await fetch('/api/workspace');
+    //     if (response.ok) {
+    //       const data = await response.json();
+    //       setWorkspaceInfo(data.workspace);
+    //     }
+    //   } catch (error) {
+    //     console.error('Error fetching workspace info:', error);
+    //   }
+    // };
+    // fetchWorkspaceInfo();
+  }, []);
 
   return (
     <div className="flex h-screen">
@@ -63,10 +90,13 @@ export default function DashboardLayout({
           <div className="glass rounded-lg p-3">
             <p className="text-xs text-gray-400 mb-1">Free Plan</p>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-white font-medium">0 / 500 tasks</span>
+              <span className="text-sm text-white font-medium">{workspaceInfo.usedTasksThisMonth} / {workspaceInfo.tasksLimit} tasks</span>
             </div>
             <div className="mt-2 h-1.5 bg-gray-700 rounded-full overflow-hidden">
-              <div className="h-full bg-[#C9A227] rounded-full" style={{ width: '0%' }} />
+              <div
+                className="h-full bg-[#C9A227] rounded-full transition-all"
+                style={{ width: `${(workspaceInfo.usedTasksThisMonth / workspaceInfo.tasksLimit) * 100}%` }}
+              />
             </div>
           </div>
         </div>

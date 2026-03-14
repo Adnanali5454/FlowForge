@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter, useParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useWorkflowStore } from '@/hooks/use-workflow-store';
 import EditorToolbar from '@/components/canvas/editor-toolbar';
@@ -21,7 +22,7 @@ const WorkflowCanvas = dynamic(() => import('@/components/canvas/workflow-canvas
   ),
 });
 
-// Demo workflow for initial load
+// Demo workflow as fallback
 function createDemoWorkflow(): WorkflowDefinition {
   const triggerId = generateId('trg');
   return {
@@ -149,22 +150,138 @@ function createDemoWorkflow(): WorkflowDefinition {
   };
 }
 
+// Create a new blank workflow
+function createNewWorkflow(): WorkflowDefinition {
+  const triggerId = generateId('trg');
+  return {
+    id: generateId('wf'),
+    workspaceId: '',
+    name: 'Untitled Workflow',
+    description: '',
+    status: 'draft',
+    version: 1,
+    trigger: {
+      id: triggerId,
+      type: 'manual',
+      connectorId: null,
+      eventKey: 'manual_trigger',
+      config: {},
+      outputSchema: { type: 'object', properties: {} },
+      position: { x: 250, y: 50 },
+    } satisfies TriggerConfig,
+    steps: [],
+    variables: {},
+    settings: {
+      errorNotificationEmail: null,
+      autoReplay: 'never',
+      errorRatioThreshold: 80,
+      maxConcurrentRuns: 5,
+      timeout: 300000,
+      retentionDays: 30,
+      floodProtection: {
+        enabled: true,
+        maxTasksPerWindow: 100,
+        windowMinutes: 10,
+      },
+    } satisfies WorkflowSettings,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    createdBy: '',
+    folderId: null,
+    tags: [],
+  };
+}
+
 export default function WorkflowEditorPage() {
+  const params = useParams();
+  const router = useRouter();
   const { workflow, loadWorkflow } = useWorkflowStore();
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // In production, fetch workflow by ID from API
-    // For now, load demo workflow
-    if (!workflow) {
-      loadWorkflow(createDemoWorkflow());
+    const workflowId = params?.workflowId as string;
+
+    if (!workflowId) {
+      setIsLoading(false);
+      return;
     }
-  }, [workflow, loadWorkflow]);
+
+    const initializeWorkflow = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        // If "new", create a new workflow via API
+        if (workflowId === 'new') {
+          const response = await fetch('/api/workflows', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: 'Untitled Workflow',
+              description: '',
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to create new workflow');
+          }
+
+          const data = await response.json();
+          const newWorkflowId = data.workflow.id;
+          router.push(`/editor/${newWorkflowId}`);
+          return;
+        }
+
+        // Otherwise, fetch the workflow by ID
+        const response = await fetch(`/api/workflows/${workflowId}`);
+
+        if (!response.ok) {
+          if (response.status === 404) {
+            throw new Error('Workflow not found');
+          }
+          throw new Error('Failed to load workflow');
+        }
+
+        const data = await response.json();
+        loadWorkflow(data.workflow);
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : 'An error occurred';
+        setError(errorMsg);
+        console.error('Error loading workflow:', err);
+        // Use demo workflow as fallback
+        loadWorkflow(createDemoWorkflow());
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (!workflow) {
+      initializeWorkflow();
+    } else {
+      setIsLoading(false);
+    }
+  }, [params?.workflowId, workflow, loadWorkflow, router]);
 
   return (
     <div className="h-screen w-full relative bg-canvas-bg">
+      {error && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-20 bg-red-500/10 border border-red-500/50 text-red-400 px-4 py-2 rounded-lg text-sm">
+          {error}
+        </div>
+      )}
       <EditorToolbar />
       <div className="pt-14 h-full">
-        <WorkflowCanvas />
+        {isLoading ? (
+          <div className="w-full h-full flex items-center justify-center bg-canvas-bg">
+            <div className="text-center">
+              <div className="w-8 h-8 border-2 border-[#C9A227] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+              <p className="text-sm text-gray-400">Loading workflow...</p>
+            </div>
+          </div>
+        ) : (
+          <WorkflowCanvas />
+        )}
       </div>
       <StepPicker />
     </div>

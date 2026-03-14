@@ -11,17 +11,19 @@ import {
   AUTH_COOKIE_NAME,
   getAuthCookieOptions,
 } from '@/lib/auth';
+import { logAudit, getClientIpAddress } from '@/lib/audit';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { action } = body;
+    const ipAddress = getClientIpAddress(request.headers);
 
     switch (action) {
       case 'register':
-        return handleRegister(body);
+        return handleRegister(body, ipAddress);
       case 'login':
-        return handleLogin(body);
+        return handleLogin(body, ipAddress);
       case 'logout':
         return handleLogout();
       default:
@@ -36,11 +38,14 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function handleRegister(body: {
-  email: string;
-  password: string;
-  name: string;
-}) {
+async function handleRegister(
+  body: {
+    email: string;
+    password: string;
+    name: string;
+  },
+  ipAddress: string | null
+) {
   const { email, password, name } = body;
 
   if (!email || !password || !name) {
@@ -105,6 +110,17 @@ async function handleRegister(body: {
     role: 'owner',
   });
 
+  // Log audit event
+  await logAudit(
+    workspace.id,
+    user.id,
+    'register',
+    'user',
+    user.id,
+    { email: user.email, name: user.name },
+    ipAddress
+  );
+
   // Create session token
   const token = await createToken({
     userId: user.id,
@@ -123,7 +139,10 @@ async function handleRegister(body: {
   return response;
 }
 
-async function handleLogin(body: { email: string; password: string }) {
+async function handleLogin(
+  body: { email: string; password: string },
+  ipAddress: string | null
+) {
   const { email, password } = body;
 
   if (!email || !password) {
@@ -168,6 +187,19 @@ async function handleLogin(body: { email: string; password: string }) {
     .where(eq(schema.workspaceMembers.userId, user.id));
 
   const primaryWorkspace = memberships[0];
+
+  // Log audit event
+  if (primaryWorkspace) {
+    await logAudit(
+      primaryWorkspace.workspaceId,
+      user.id,
+      'login',
+      'user',
+      user.id,
+      { email: user.email },
+      ipAddress
+    );
+  }
 
   // Create session token
   const token = await createToken({

@@ -106,12 +106,29 @@ export interface DynamicFieldResult {
 // ─── Connector Registry (in-memory) ────────────────────────────────────────
 
 const connectorRegistry = new Map<string, ConnectorPlugin>();
+const manifestRegistry = new Map<string, ConnectorManifest>();
 
 /**
  * Register a connector plugin.
  */
 export function registerConnector(plugin: ConnectorPlugin): void {
   connectorRegistry.set(plugin.manifest.slug, plugin);
+  manifestRegistry.set(plugin.manifest.slug, plugin.manifest);
+}
+
+/**
+ * Register connector manifests without full implementations.
+ * Used for displaying available connectors in the UI.
+ */
+export function registerConnectorManifest(manifest: ConnectorManifest): void {
+  manifestRegistry.set(manifest.slug, manifest);
+}
+
+/**
+ * Register multiple connector manifests at once.
+ */
+export function registerConnectorManifests(manifests: ConnectorManifest[]): void {
+  manifests.forEach((manifest) => registerConnectorManifest(manifest));
 }
 
 /**
@@ -130,9 +147,10 @@ export function getAllConnectors(): ConnectorPlugin[] {
 
 /**
  * Get all connector manifests (for listing in UI).
+ * Includes both fully implemented connectors and manifest-only registrations.
  */
 export function getAllConnectorManifests(): ConnectorManifest[] {
-  return getAllConnectors().map((c) => c.manifest);
+  return Array.from(manifestRegistry.values());
 }
 
 // ─── Helper: Create a connector manifest ────────────────────────────────────

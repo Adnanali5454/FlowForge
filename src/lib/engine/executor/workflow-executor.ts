@@ -22,6 +22,12 @@ import type {
   CodeConfig,
   HttpConfig,
   ActionConfig,
+  AiConfig,
+  StorageConfig,
+  DigestConfig,
+  SubWorkflowConfig,
+  HitlConfig,
+  ErrorHandlerConfig,
 } from '@/types';
 import {
   type ExecutionContext,
@@ -33,7 +39,14 @@ import { executeFormatter } from '../steps/formatter';
 import { executeDelay } from '../steps/delay';
 import { executeHttp } from '../steps/http';
 import { executeCode } from '../steps/code';
+import { executeAi } from '../steps/ai';
+import { executeStorage } from '../steps/storage';
+import { executeDigest } from '../steps/digest';
+import { executeSubWorkflow } from '../steps/sub-workflow';
+import { executeHitl } from '../steps/hitl';
+import { executeErrorHandler } from '../steps/error-handler';
 import { generateId } from '@/lib/utils';
+import { getConnector } from '@/lib/connectors/base';
 
 // ─── Execution State ────────────────────────────────────────────────────────
 
@@ -186,9 +199,24 @@ export class WorkflowExecutor {
           case 'retry':
             // Retry is handled inside executeStep
             break;
-          case 'route':
-            // Route to error handler step — would need step lookup
+          case 'route': {
+            // Route to error handler step
+            const routeToStepId = step.errorHandling?.routeToStepId;
+            if (routeToStepId) {
+              const targetStep = this.workflow.steps.find((s) => s.id === routeToStepId);
+              if (targetStep) {
+                // Execute the error handler step
+                const errorHandlerRecord = await this.executeStep(targetStep, i + 1);
+                // Store in results
+                this.context.steps[targetStep.id] = {
+                  input: errorHandlerRecord.inputData,
+                  output: errorHandlerRecord.outputData ?? {},
+                  status: errorHandlerRecord.status,
+                };
+              }
+            }
             break;
+          }
         }
       }
     }
@@ -343,40 +371,122 @@ export class WorkflowExecutor {
 
       case 'action': {
         const actionConfig = config as ActionConfig;
-        // Actions are executed via the connector framework
-        // For now, pass through the config — connector execution handled by ConnectorExecutor
+        const { connectorId, actionKey, params } = actionConfig;
+
+        // Look up the connector by ID (using slug)
+        const connector = getConnector(connectorId);
+        if (!connector) {
+          throw new Error(`Connector '${connectorId}' not found`);
+        }
+
+        // Execute the action with empty credentials (normally would come from appConnections)
+        const result = await connector.executeAction(actionKey, {}, params);
+
+        if (!result.success) {
+          throw new Error(result.error || 'Action failed');
+        }
+
         return {
-          connectorId: actionConfig.connectorId,
-          actionKey: actionConfig.actionKey,
-          params: actionConfig.params,
-          __note: 'Action executed via connector framework',
+          connectorId,
+          actionKey,
+          success: result.success,
+          data: result.data,
         };
       }
 
-      case 'ai':
-        // AI step — Phase 2 implementation
-        return { __note: 'AI step execution — Phase 2' };
+      case 'ai': {
+        const aiConfig = config as AiConfig;
+        const result = await executeAi(aiConfig, inputData);
+        return {
+          model: result.model,
+          output: result.output,
+          tokensUsed: result.tokensUsed,
+          durationMs: result.durationMs,
+        };
+      }
 
-      case 'human-in-the-loop':
-        // HITL — set execution to 'waiting' status
+      case 'human-in-the-loop': {
+        const hitlConfig = config as HitlConfig;
+        const result = await executeHitl(
+          hitlConfig,
+          this.workflow.workspaceId,
+          this.state.id,
+          step.id
+        );
+        // Set execution status to waiting for HITL approval
         this.state.status = 'waiting';
-        return { __note: 'Awaiting human approval', __waiting: true };
+        return {
+          status: result.status,
+          approvalId: result.approvalId,
+          assigneeEmail: result.assigneeEmail,
+          instructions: result.instructions,
+          deadline: result.deadline,
+          deadlineAction: result.deadlineAction,
+          escalateTo: result.escalateTo,
+          fields: result.fields,
+          __waiting: true,
+        };
+      }
 
-      case 'sub-workflow':
-        // Sub-workflow — Phase 2
-        return { __note: 'Sub-workflow execution — Phase 2' };
+      case 'sub-workflow': {
+        const subConfig = config as SubWorkflowConfig;
+        const result = await executeSubWorkflow(
+          subConfig,
+          this.context,
+          this.workflow.id
+        );
+        return {
+          targetWorkflowId: result.targetWorkflowId,
+          executionId: result.executionId,
+          status: result.status,
+          stepsExecuted: result.stepsExecuted,
+          error: result.error,
+          output: result.output,
+          durationMs: result.durationMs,
+        };
+      }
 
-      case 'digest':
-        // Digest — Phase 2
-        return { __note: 'Digest step — Phase 2' };
+      case 'digest': {
+        const digestConfig = config as DigestConfig;
+        const result = await executeDigest(
+          digestConfig,
+          this.workflow.workspaceId,
+          inputData
+        );
+        return {
+          action: result.action,
+          digestKey: result.digestKey,
+          entryCount: result.entryCount,
+          entries: result.entries,
+        };
+      }
 
-      case 'storage':
-        // Storage — Phase 2
-        return { __note: 'Storage step — Phase 2' };
+      case 'storage': {
+        const storageConfig = config as StorageConfig;
+        const result = await executeStorage(
+          storageConfig,
+          this.workflow.workspaceId
+        );
+        return {
+          action: result.action,
+          key: result.key,
+          namespace: result.namespace,
+          value: result.value,
+          previousValue: result.previousValue,
+        };
+      }
 
-      case 'error-handler':
-        // Error handler is a routing construct, not directly executable
-        return { __note: 'Error handler — route configuration only' };
+      case 'error-handler': {
+        const errorConfig = config as ErrorHandlerConfig;
+        const result = executeErrorHandler(errorConfig);
+        return {
+          action: result.action,
+          maxRetries: result.maxRetries,
+          retryDelayMs: result.retryDelayMs,
+          retryBackoff: result.retryBackoff,
+          routeToStepId: result.routeToStepId,
+        };
+      }
 
       default:
         return { __note: `Unknown step type: ${step.type}` };

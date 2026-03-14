@@ -7,6 +7,7 @@ import { db, schema } from '@/lib/db';
 import { eq, desc, and } from 'drizzle-orm';
 import { verifyToken, AUTH_COOKIE_NAME } from '@/lib/auth';
 import { generateId } from '@/lib/utils';
+import { logAudit, getClientIpAddress } from '@/lib/audit';
 import type { TriggerConfig, WorkflowSettings } from '@/types';
 
 /**
@@ -100,6 +101,18 @@ export async function POST(request: NextRequest) {
         folderId: body.folderId ?? null,
       })
       .returning();
+
+    // Log audit event
+    const ipAddress = getClientIpAddress(request.headers);
+    await logAudit(
+      session.workspaceId,
+      session.userId,
+      'create',
+      'workflow',
+      workflow.id,
+      { name: workflow.name, description: workflow.description },
+      ipAddress
+    );
 
     return NextResponse.json({ workflow }, { status: 201 });
   } catch (error) {

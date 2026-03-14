@@ -4,9 +4,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db, schema } from '@/lib/db';
-import { eq, desc, and } from 'drizzle-orm';
+import { eq, desc, and, sql } from 'drizzle-orm';
 import { verifyToken, AUTH_COOKIE_NAME } from '@/lib/auth';
 import { WorkflowExecutor } from '@/lib/engine';
+import { logAudit, getClientIpAddress } from '@/lib/audit';
 import type { WorkflowDefinition, TriggerConfig, StepConfig, WorkflowSettings, WorkflowVariable } from '@/types';
 
 /**
@@ -107,6 +108,18 @@ export async function POST(request: NextRequest) {
       tags: workflowRow.tags as string[],
     };
 
+    // Log audit event for manual trigger
+    const ipAddress = getClientIpAddress(request.headers);
+    await logAudit(
+      session.workspaceId,
+      session.userId,
+      'trigger',
+      'workflow_execution',
+      workflowId,
+      { trigger: 'manual' },
+      ipAddress
+    );
+
     // Create execution record
     const [executionRow] = await db
       .insert(schema.workflowExecutions)
@@ -119,10 +132,46 @@ export async function POST(request: NextRequest) {
       })
       .returning();
 
-    // Execute the workflow
+    // Execute the workflow with full logging callbacks
     const executor = new WorkflowExecutor(workflow, triggerData, {
+      onStepStart: async (step) => {
+        // Log step start to DB with 'running' status
+        await db.insert(schema.stepExecutions).values({
+          executionId: executionRow.id,
+          stepId: step.stepId,
+          stepIndex: step.stepIndex,
+          stepType: step.stepType,
+          stepName: step.stepName,
+          status: 'running',
+          inputData: step.inputData,
+          outputData: null,
+          error: null,
+          retryCount: step.retryCount,
+          startedAt: step.startedAt,
+          completedAt: null,
+          durationMs: null,
+        });
+      },
       onStepComplete: async (step) => {
-        // Log step execution to DB
+        // Log step execution to DB with final status
+        await db.insert(schema.stepExecutions).values({
+          executionId: executionRow.id,
+          stepId: step.stepId,
+          stepIndex: step.stepIndex,
+          stepType: step.stepType,
+          stepName: step.stepName,
+          status: step.status,
+          inputData: step.inputData,
+          outputData: step.outputData,
+          error: step.error,
+          retryCount: step.retryCount,
+          startedAt: step.startedAt,
+          completedAt: step.completedAt,
+          durationMs: step.durationMs,
+        });
+      },
+      onStepError: async (step, _error) => {
+        // Log step error to DB
         await db.insert(schema.stepExecutions).values({
           executionId: executionRow.id,
           stepId: step.stepId,
@@ -143,13 +192,14 @@ export async function POST(request: NextRequest) {
 
     const result = await executor.execute();
 
-    // Update execution record with final status
+    // Update execution record with final status and outputData
     await db
       .update(schema.workflowExecutions)
       .set({
         status: result.status,
         stepsExecuted: result.stepsExecuted,
         error: result.error,
+        outputData: executor.toJSON().steps,
         completedAt: result.completedAt,
         durationMs: result.completedAt
           ? result.completedAt.getTime() - result.startedAt.getTime()
@@ -157,13 +207,36 @@ export async function POST(request: NextRequest) {
       })
       .where(eq(schema.workflowExecutions.id, executionRow.id));
 
-    // Update workspace task count
-    await db
-      .update(schema.workspaces)
-      .set({
-        usedTasksThisMonth: result.stepsExecuted,
-      })
+    // Update workspace task count and check/reset task reset date
+    const workspace = await db
+      .select()
+      .from(schema.workspaces)
       .where(eq(schema.workspaces.id, session.workspaceId));
+
+    if (workspace.length > 0) {
+      const ws = workspace[0];
+      const taskResetDate = ws.taskResetDate ? new Date(ws.taskResetDate) : null;
+      const now = new Date();
+      const currentMonth = now.toISOString().slice(0, 7); // YYYY-MM
+      const resetMonth = taskResetDate ? taskResetDate.toISOString().slice(0, 7) : null;
+
+      let newUsedTasks = (ws.usedTasksThisMonth || 0) + 1; // Increment by 1 (each execution = 1 task)
+      let newResetDate = taskResetDate;
+
+      // Reset if month has changed
+      if (!resetMonth || resetMonth !== currentMonth) {
+        newUsedTasks = 1;
+        newResetDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      }
+
+      await db
+        .update(schema.workspaces)
+        .set({
+          usedTasksThisMonth: newUsedTasks,
+          taskResetDate: newResetDate,
+        })
+        .where(eq(schema.workspaces.id, session.workspaceId));
+    }
 
     return NextResponse.json({
       execution: {

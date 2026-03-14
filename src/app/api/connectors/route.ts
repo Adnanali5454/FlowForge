@@ -1,5 +1,7 @@
 // ─── Connectors API ─────────────────────────────────────────────────────────
 // GET /api/connectors — List all available connectors
+// Query params:
+//   - category: Filter by category (communication, crm, productivity, etc.)
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getAllConnectorManifests, initializeBuiltInConnectors } from '@/lib/connectors';
@@ -9,10 +11,19 @@ initializeBuiltInConnectors();
 
 /**
  * GET /api/connectors — List all available connectors
+ * Supports category filtering via query param
  */
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const manifests = getAllConnectorManifests();
+    let manifests = getAllConnectorManifests();
+
+    // Support category filtering
+    const { searchParams } = new URL(request.url);
+    const categoryFilter = searchParams.get('category');
+
+    if (categoryFilter) {
+      manifests = manifests.filter((m) => m.category === categoryFilter);
+    }
 
     return NextResponse.json({
       connectors: manifests.map((m) => ({

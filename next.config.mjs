@@ -11,6 +11,10 @@ const nextConfig = {
         protocol: 'https',
         hostname: '**.flowforge.io',
       },
+      {
+        protocol: 'https',
+        hostname: 'blob.vercel-storage.com',
+      },
     ],
   },
 };
