@@ -5,6 +5,14 @@ const nextConfig = {
       bodySizeLimit: '2mb',
     },
   },
+  webpack: (config, { dev }) => {
+    if (dev) {
+      // Disable persistent FS cache in dev to prevent stale chunk errors
+      // when files are added/changed outside of the running server
+      config.cache = false;
+    }
+    return config;
+  },
   images: {
     remotePatterns: [
       {

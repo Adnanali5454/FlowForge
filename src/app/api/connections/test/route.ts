@@ -24,7 +24,8 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const connectionId = body.id as string;
+    // Accept either 'id' or 'connectionId' for compatibility
+    const connectionId = (body.id ?? body.connectionId) as string;
 
     if (!connectionId) {
       return NextResponse.json(

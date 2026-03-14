@@ -59,7 +59,8 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const connectorId = body.connectorId as string;
+    // Accept connectorId or connectorSlug (UI sends connectorSlug)
+    const connectorId = (body.connectorId ?? body.connectorSlug) as string;
     const name = body.name as string;
     const credentials = body.credentials as Record<string, unknown>;
 
@@ -69,17 +70,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-
-    // Verify connector exists
-    const connector = await db
-      .select()
-      .from(schema.connectorRegistry)
-      .where(eq(schema.connectorRegistry.id, connectorId))
-      .limit(1);
-
-    if (!connector.length) {
-      return NextResponse.json({ error: 'Connector not found' }, { status: 404 });
-    }
+    // Connectors live in the in-memory registry; no DB lookup needed
 
     // Store credentials (in production, these should be encrypted)
     const [connection] = await db
