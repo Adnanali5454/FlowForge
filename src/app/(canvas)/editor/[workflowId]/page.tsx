@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import { useWorkflowStore } from '@/hooks/use-workflow-store';
 import EditorToolbar from '@/components/canvas/editor-toolbar';
 import StepPicker from '@/components/canvas/step-picker';
+import AICopilotSidebar from '@/components/canvas/ai-copilot-sidebar';
 import type { WorkflowDefinition, TriggerConfig, WorkflowSettings } from '@/types';
 import { generateId } from '@/lib/utils';
 
@@ -284,6 +285,7 @@ export default function WorkflowEditorPage() {
         )}
       </div>
       <StepPicker />
+      <AICopilotSidebar />
     </div>
   );
 }
