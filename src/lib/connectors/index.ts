@@ -26,6 +26,16 @@ import slackConnector from './implementations/slack';
 import stripeConnector from './implementations/stripe';
 import openaiConnector from './implementations/openai';
 import anthropicConnector from './implementations/anthropic';
+import pipedriveConnector from './implementations/pipedrive';
+import zendeskConnector from './implementations/zendesk';
+import airtableConnector from './implementations/airtable';
+import mailchimpConnector from './implementations/mailchimp';
+import twilioConnector from './implementations/twilio';
+import shopifyConnector from './implementations/shopify';
+import jiraConnector from './implementations/jira';
+import linearConnector from './implementations/linear';
+import notionConnector from './implementations/notion';
+import googleSheetsConnector from './implementations/google-sheets';
 
 /**
  * Register all built-in connectors.
@@ -43,6 +53,18 @@ export function initializeBuiltInConnectors(): void {
   registerConnector(stripeConnector);
   registerConnector(openaiConnector);
   registerConnector(anthropicConnector);
+
+  // Tier 1 connector implementations
+  registerConnector(pipedriveConnector);
+  registerConnector(zendeskConnector);
+  registerConnector(airtableConnector);
+  registerConnector(mailchimpConnector);
+  registerConnector(twilioConnector);
+  registerConnector(shopifyConnector);
+  registerConnector(jiraConnector);
+  registerConnector(linearConnector);
+  registerConnector(notionConnector);
+  registerConnector(googleSheetsConnector);
 
   // 50 priority connector manifests (metadata only)
   // Full implementations for each will be added incrementally
