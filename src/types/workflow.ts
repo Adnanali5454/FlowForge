@@ -468,6 +468,7 @@ export interface ApiKeyConfig {
   location?: 'header' | 'query';
   apiKeyField?: string;
   apiKeyLabel?: string;
+  fields?: Array<{ key: string; label: string; type: string; required?: boolean }>;
 }
 
 export interface BasicAuthConfig {

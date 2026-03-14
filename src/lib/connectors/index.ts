@@ -36,6 +36,16 @@ import jiraConnector from './implementations/jira';
 import linearConnector from './implementations/linear';
 import notionConnector from './implementations/notion';
 import googleSheetsConnector from './implementations/google-sheets';
+import discordConnector from './implementations/discord';
+import githubConnector from './implementations/github';
+import hubspotConnector from './implementations/hubspot';
+import salesforceConnector from './implementations/salesforce';
+import microsoftTeamsConnector from './implementations/microsoft-teams';
+import googleCalendarConnector from './implementations/google-calendar';
+import dropboxConnector from './implementations/dropbox';
+import zoomConnector from './implementations/zoom';
+import intercomConnector from './implementations/intercom';
+import asanaConnector from './implementations/asana';
 
 /**
  * Register all built-in connectors.
@@ -65,6 +75,18 @@ export function initializeBuiltInConnectors(): void {
   registerConnector(linearConnector);
   registerConnector(notionConnector);
   registerConnector(googleSheetsConnector);
+
+  // Tier 1 connector implementations (batch 2)
+  registerConnector(discordConnector);
+  registerConnector(githubConnector);
+  registerConnector(hubspotConnector);
+  registerConnector(salesforceConnector);
+  registerConnector(microsoftTeamsConnector);
+  registerConnector(googleCalendarConnector);
+  registerConnector(dropboxConnector);
+  registerConnector(zoomConnector);
+  registerConnector(intercomConnector);
+  registerConnector(asanaConnector);
 
   // 50 priority connector manifests (metadata only)
   // Full implementations for each will be added incrementally
