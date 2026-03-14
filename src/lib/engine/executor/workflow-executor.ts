@@ -92,14 +92,17 @@ export class WorkflowExecutor {
   private workflow: WorkflowDefinition;
   private context: ExecutionContext;
   private callbacks: ExecutionCallbacks;
+  private credentialResolver?: (connectorId: string, workspaceId: string) => Promise<Record<string, string>>;
 
   constructor(
     workflow: WorkflowDefinition,
     triggerData: Record<string, unknown>,
-    callbacks: ExecutionCallbacks = {}
+    callbacks: ExecutionCallbacks = {},
+    credentialResolver?: (connectorId: string, workspaceId: string) => Promise<Record<string, string>>
   ) {
     this.workflow = workflow;
     this.callbacks = callbacks;
+    this.credentialResolver = credentialResolver;
 
     this.state = {
       id: generateId('exec'),
@@ -379,8 +382,11 @@ export class WorkflowExecutor {
           throw new Error(`Connector '${connectorId}' not found`);
         }
 
-        // Execute the action with empty credentials (normally would come from appConnections)
-        const result = await connector.executeAction(actionKey, {}, params);
+        // Resolve credentials via the injected resolver (falls back to empty object)
+        const credentials = this.credentialResolver
+          ? await this.credentialResolver(connectorId, this.workflow.workspaceId)
+          : {};
+        const result = await connector.executeAction(actionKey, credentials, params);
 
         if (!result.success) {
           throw new Error(result.error || 'Action failed');

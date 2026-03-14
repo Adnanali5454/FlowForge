@@ -417,24 +417,26 @@ export type ConnectorCategory =
   | 'analytics'
   | 'storage'
   | 'ai'
-  | 'utility';
+  | 'utility'
+  | 'email'
+  | 'payments';
 
 export interface ConnectorTriggerDef {
   key: string;
   name: string;
   description: string;
   type: 'webhook' | 'polling';
-  outputSchema: JsonSchema;
-  configFields: ConnectorField[];
+  outputSchema?: JsonSchema;
+  configFields?: ConnectorField[];
 }
 
 export interface ConnectorActionDef {
   key: string;
   name: string;
   description: string;
-  inputSchema: JsonSchema;
-  outputSchema: JsonSchema;
-  configFields: ConnectorField[];
+  inputSchema?: JsonSchema;
+  outputSchema?: JsonSchema;
+  configFields?: ConnectorField[];
 }
 
 export interface ConnectorField {
@@ -445,23 +447,27 @@ export interface ConnectorField {
   placeholder?: string;
   helpText?: string;
   options?: { label: string; value: string }[];
-  dependsOn?: string;          // Dynamic field loading
+  dependsOn?: string;
+  isDynamic?: boolean;
+  dynamicKey?: string;
 }
 
 export interface OAuthConfig {
-  type: 'oauth2';
+  type?: 'oauth2';
   authorizationUrl: string;
   tokenUrl: string;
   scopes: string[];
-  clientId: string;
-  clientSecret: string;
+  clientId?: string;
+  clientSecret?: string;
 }
 
 export interface ApiKeyConfig {
-  type: 'api_key';
-  headerName: string;
-  prefix: string;              // e.g., 'Bearer ', 'Token '
-  location: 'header' | 'query';
+  type?: 'api_key';
+  headerName?: string;
+  prefix?: string;              // e.g., 'Bearer ', 'Token '
+  location?: 'header' | 'query';
+  apiKeyField?: string;
+  apiKeyLabel?: string;
 }
 
 export interface BasicAuthConfig {

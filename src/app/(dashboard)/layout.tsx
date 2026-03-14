@@ -7,14 +7,21 @@ import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
   { href: '/workflows', label: 'Workflows', icon: '⚡' },
-  { href: '/executions', label: 'Executions', icon: '📊' },
-  { href: '/connectors', label: 'Connectors', icon: '🔌' },
+  { href: '/tables', label: 'Tables', icon: '📊' },
+  { href: '/interfaces', label: 'Interfaces', icon: '📝' },
+  { href: '/chatbots', label: 'Chatbots', icon: '🤖' },
+  { href: '/canvas', label: 'Canvas', icon: '🎨' },
+  { href: '/agents', label: 'Agents', icon: '🧠' },
+  { href: '/transfer', label: 'Transfer', icon: '↔️' },
+  { href: '/executions', label: 'Executions', icon: '📈' },
+  { href: '/connections', label: 'Connections', icon: '🔗' },
   { href: '/settings', label: 'Settings', icon: '⚙️' },
 ];
 
 interface WorkspaceInfo {
   usedTasksThisMonth: number;
   tasksLimit: number;
+  planName: string;
 }
 
 export default function DashboardLayout({
@@ -26,23 +33,28 @@ export default function DashboardLayout({
   const [workspaceInfo, setWorkspaceInfo] = useState<WorkspaceInfo>({
     usedTasksThisMonth: 0,
     tasksLimit: 500,
+    planName: 'Free',
   });
 
   useEffect(() => {
-    // TODO: Create /api/workspace endpoint to fetch workspace info
-    // For now, we'll use hardcoded values
-    // const fetchWorkspaceInfo = async () => {
-    //   try {
-    //     const response = await fetch('/api/workspace');
-    //     if (response.ok) {
-    //       const data = await response.json();
-    //       setWorkspaceInfo(data.workspace);
-    //     }
-    //   } catch (error) {
-    //     console.error('Error fetching workspace info:', error);
-    //   }
-    // };
-    // fetchWorkspaceInfo();
+    const fetchWorkspaceInfo = async () => {
+      try {
+        const response = await fetch('/api/workspace');
+        if (response.ok) {
+          const data = await response.json();
+          const ws = data.workspace;
+          const plan: string = ws.plan ?? 'free';
+          setWorkspaceInfo({
+            usedTasksThisMonth: ws.usedTasksThisMonth ?? 0,
+            tasksLimit: ws.maxTasksPerMonth ?? 500,
+            planName: plan.charAt(0).toUpperCase() + plan.slice(1),
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching workspace info:', error);
+      }
+    };
+    fetchWorkspaceInfo();
   }, []);
 
   return (
@@ -88,7 +100,7 @@ export default function DashboardLayout({
         {/* Plan info */}
         <div className="px-4 py-4 border-t border-gray-800">
           <div className="glass rounded-lg p-3">
-            <p className="text-xs text-gray-400 mb-1">Free Plan</p>
+            <p className="text-xs text-gray-400 mb-1">{workspaceInfo.planName} Plan</p>
             <div className="flex items-center justify-between">
               <span className="text-sm text-white font-medium">{workspaceInfo.usedTasksThisMonth} / {workspaceInfo.tasksLimit} tasks</span>
             </div>

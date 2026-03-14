@@ -21,6 +21,11 @@ import { webhookConnector } from './webhook';
 import { schedulerConnector } from './scheduler';
 import { dynamicHttpConnector } from './dynamic';
 import { priorityConnectorManifests } from './manifests';
+import gmailConnector from './implementations/gmail';
+import slackConnector from './implementations/slack';
+import stripeConnector from './implementations/stripe';
+import openaiConnector from './implementations/openai';
+import anthropicConnector from './implementations/anthropic';
 
 /**
  * Register all built-in connectors.
@@ -32,7 +37,14 @@ export function initializeBuiltInConnectors(): void {
   registerConnector(schedulerConnector);
   registerConnector(dynamicHttpConnector);
 
-  // 50 priority connector manifests
+  // Priority connector full implementations
+  registerConnector(gmailConnector);
+  registerConnector(slackConnector);
+  registerConnector(stripeConnector);
+  registerConnector(openaiConnector);
+  registerConnector(anthropicConnector);
+
+  // 50 priority connector manifests (metadata only)
   // Full implementations for each will be added incrementally
   // Users can still integrate with these apps via the dynamic HTTP connector
   registerConnectorManifests(priorityConnectorManifests);

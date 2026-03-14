@@ -393,3 +393,249 @@ export const appConnectionsRelations = relations(appConnections, ({ one }) => ({
     references: [connectorRegistry.id],
   }),
 }));
+
+// ─── FlowForge Tables ────────────────────────────────────────────────────────
+
+export const flowforgeTables = pgTable('flowforge_tables', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 255 }).notNull(),
+  description: text('description').default('').notNull(),
+  icon: varchar('icon', { length: 10 }).default('📊').notNull(),
+  createdBy: uuid('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  workspaceIdx: index('ff_tables_workspace_idx').on(table.workspaceId),
+}));
+
+export const flowforgeTableColumns = pgTable('flowforge_table_columns', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tableId: uuid('table_id').notNull().references(() => flowforgeTables.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 255 }).notNull(),
+  type: varchar('type', { length: 50 }).notNull(), // text/number/boolean/date/email/url/select/multiselect/checkbox/attachment/ai/formula/autonumber/created_time/created_by
+  config: jsonb('config').default({}).notNull(), // { options: string[], formula: string, linkedTableId: string }
+  position: integer('position').default(0).notNull(),
+  isRequired: boolean('is_required').default(false).notNull(),
+  defaultValue: text('default_value'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  tableIdx: index('ff_columns_table_idx').on(table.tableId),
+}));
+
+export const flowforgeTableRows = pgTable('flowforge_table_rows', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tableId: uuid('table_id').notNull().references(() => flowforgeTables.id, { onDelete: 'cascade' }),
+  data: jsonb('data').default({}).notNull(),
+  createdBy: uuid('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  tableIdx: index('ff_rows_table_idx').on(table.tableId),
+}));
+
+export const flowforgeTableViews = pgTable('flowforge_table_views', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tableId: uuid('table_id').notNull().references(() => flowforgeTables.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 255 }).notNull(),
+  type: varchar('type', { length: 20 }).default('grid').notNull(), // grid/form/gallery/calendar/kanban
+  config: jsonb('config').default({}).notNull(),
+  createdBy: uuid('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  tableIdx: index('ff_views_table_idx').on(table.tableId),
+}));
+
+// ─── FlowForge Tables Relations ──────────────────────────────────────────────
+
+export const flowforgeTablesRelations = relations(flowforgeTables, ({ one, many }) => ({
+  workspace: one(workspaces, {
+    fields: [flowforgeTables.workspaceId],
+    references: [workspaces.id],
+  }),
+  creator: one(users, {
+    fields: [flowforgeTables.createdBy],
+    references: [users.id],
+  }),
+  columns: many(flowforgeTableColumns),
+  rows: many(flowforgeTableRows),
+  views: many(flowforgeTableViews),
+}));
+
+export const flowforgeTableColumnsRelations = relations(flowforgeTableColumns, ({ one }) => ({
+  table: one(flowforgeTables, {
+    fields: [flowforgeTableColumns.tableId],
+    references: [flowforgeTables.id],
+  }),
+}));
+
+export const flowforgeTableRowsRelations = relations(flowforgeTableRows, ({ one }) => ({
+  table: one(flowforgeTables, {
+    fields: [flowforgeTableRows.tableId],
+    references: [flowforgeTables.id],
+  }),
+  creator: one(users, {
+    fields: [flowforgeTableRows.createdBy],
+    references: [users.id],
+  }),
+}));
+
+export const flowforgeTableViewsRelations = relations(flowforgeTableViews, ({ one }) => ({
+  table: one(flowforgeTables, {
+    fields: [flowforgeTableViews.tableId],
+    references: [flowforgeTables.id],
+  }),
+  creator: one(users, {
+    fields: [flowforgeTableViews.createdBy],
+    references: [users.id],
+  }),
+}));
+
+// ─── FlowForge Interfaces (Forms) ────────────────────────────────────────────
+
+export const flowforgeInterfaces = pgTable('flowforge_interfaces', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 255 }).notNull(),
+  description: text('description').default('').notNull(),
+  type: varchar('type', { length: 20 }).default('form').notNull(),
+  config: jsonb('config').default({}).notNull(),
+  isPublished: boolean('is_published').default(false).notNull(),
+  brandingConfig: jsonb('branding_config').default({}).notNull(),
+  createdBy: uuid('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  workspaceIdx: index('ff_interfaces_workspace_idx').on(table.workspaceId),
+}));
+
+export const flowforgeInterfaceFields = pgTable('flowforge_interface_fields', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  interfaceId: uuid('interface_id').notNull().references(() => flowforgeInterfaces.id, { onDelete: 'cascade' }),
+  type: varchar('type', { length: 50 }).notNull(),
+  label: varchar('label', { length: 255 }).notNull(),
+  placeholder: varchar('placeholder', { length: 500 }).default('').notNull(),
+  helpText: text('help_text').default('').notNull(),
+  isRequired: boolean('is_required').default(false).notNull(),
+  config: jsonb('config').default({}).notNull(),
+  conditionalLogic: jsonb('conditional_logic').default({}).notNull(),
+  position: integer('position').default(0).notNull(),
+}, (table) => ({
+  interfaceIdx: index('ff_fields_interface_idx').on(table.interfaceId),
+}));
+
+export const flowforgeInterfaceSubmissions = pgTable('flowforge_interface_submissions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  interfaceId: uuid('interface_id').notNull().references(() => flowforgeInterfaces.id, { onDelete: 'cascade' }),
+  data: jsonb('data').default({}).notNull(),
+  ipAddress: varchar('ip_address', { length: 45 }),
+  userAgent: text('user_agent'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  interfaceIdx: index('ff_submissions_interface_idx').on(table.interfaceId),
+}));
+
+// ─── FlowForge Chatbots ───────────────────────────────────────────────────────
+
+export const flowforgeChatbots = pgTable('flowforge_chatbots', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 255 }).notNull(),
+  description: text('description').default('').notNull(),
+  model: varchar('model', { length: 100 }).default('claude-sonnet').notNull(),
+  systemPrompt: text('system_prompt').default('').notNull(),
+  welcomeMessage: text('welcome_message').default('Hello! How can I help you today?').notNull(),
+  suggestedQuestions: jsonb('suggested_questions').default([]).notNull(),
+  brandingConfig: jsonb('branding_config').default({}).notNull(),
+  isPublished: boolean('is_published').default(false).notNull(),
+  createdBy: uuid('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  workspaceIdx: index('ff_chatbots_workspace_idx').on(table.workspaceId),
+}));
+
+export const flowforgeChatbotConversations = pgTable('flowforge_chatbot_conversations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  chatbotId: uuid('chatbot_id').notNull().references(() => flowforgeChatbots.id, { onDelete: 'cascade' }),
+  sessionId: varchar('session_id', { length: 100 }).notNull(),
+  messages: jsonb('messages').default([]).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  chatbotIdx: index('ff_conversations_chatbot_idx').on(table.chatbotId),
+  sessionIdx: index('ff_conversations_session_idx').on(table.sessionId),
+}));
+
+// ─── FlowForge Agents ────────────────────────────────────────────────────────
+
+export const flowforgeAgents = pgTable('flowforge_agents', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 255 }).notNull(),
+  description: text('description').default('').notNull(),
+  type: varchar('type', { length: 50 }).default('task').notNull(),
+  model: varchar('model', { length: 100 }).default('claude-sonnet').notNull(),
+  systemPrompt: text('system_prompt').default('').notNull(),
+  tools: jsonb('tools').default([]).notNull(),
+  constraints: jsonb('constraints').default({}).notNull(),
+  memory: jsonb('memory').default({}).notNull(),
+  triggerConfig: jsonb('trigger_config').default({}).notNull(),
+  isActive: boolean('is_active').default(false).notNull(),
+  createdBy: uuid('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  workspaceIdx: index('ff_agents_workspace_idx').on(table.workspaceId),
+}));
+
+export const flowforgeAgentRuns = pgTable('flowforge_agent_runs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  agentId: uuid('agent_id').notNull().references(() => flowforgeAgents.id, { onDelete: 'cascade' }),
+  trigger: text('trigger').default('manual').notNull(),
+  status: varchar('status', { length: 20 }).default('pending').notNull(),
+  steps: jsonb('steps').default([]).notNull(),
+  totalTokens: integer('total_tokens').default(0).notNull(),
+  startedAt: timestamp('started_at').defaultNow().notNull(),
+  completedAt: timestamp('completed_at'),
+}, (table) => ({
+  agentIdx: index('ff_agent_runs_agent_idx').on(table.agentId),
+}));
+
+// ─── FlowForge Transfer ──────────────────────────────────────────────────────
+
+export const flowforgeTransfers = pgTable('flowforge_transfers', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 255 }).notNull(),
+  sourceConnectorId: varchar('source_connector_id', { length: 100 }).notNull(),
+  sourceConfig: jsonb('source_config').default({}).notNull(),
+  destConnectorId: varchar('dest_connector_id', { length: 100 }).notNull(),
+  destConfig: jsonb('dest_config').default({}).notNull(),
+  fieldMapping: jsonb('field_mapping').default({}).notNull(),
+  status: varchar('status', { length: 20 }).default('draft').notNull(),
+  totalRecords: integer('total_records').default(0).notNull(),
+  processedRecords: integer('processed_records').default(0).notNull(),
+  errorRecords: integer('error_records').default(0).notNull(),
+  startedAt: timestamp('started_at'),
+  completedAt: timestamp('completed_at'),
+  createdBy: uuid('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  workspaceIdx: index('ff_transfers_workspace_idx').on(table.workspaceId),
+}));
+
+// ─── FlowForge Canvas ────────────────────────────────────────────────────────
+
+export const flowforgeCanvases = pgTable('flowforge_canvases', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 255 }).notNull(),
+  description: text('description').default('').notNull(),
+  data: jsonb('data').default({ nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } }).notNull(),
+  createdBy: uuid('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  workspaceIdx: index('ff_canvases_workspace_idx').on(table.workspaceId),
+}));

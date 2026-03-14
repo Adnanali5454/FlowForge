@@ -61,7 +61,7 @@ export async function executeAction(
 
     return {
       success: result.success,
-      data: result.data,
+      data: result.data ?? {},
       error: result.error,
     };
   } catch (error) {

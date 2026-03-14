@@ -83,9 +83,11 @@ export interface ConnectorPlugin {
 // ─── Result Types ───────────────────────────────────────────────────────────
 
 export interface PollResult {
-  items: Record<string, unknown>[];
-  newState: Record<string, unknown>;  // Cursor/state for next poll
-  hasMore: boolean;
+  items?: Record<string, unknown>[];
+  newItems?: Record<string, unknown>[];
+  newState?: Record<string, unknown>;
+  nextPollState?: Record<string, unknown>;
+  hasMore?: boolean;
 }
 
 export interface WebhookResult {
@@ -95,7 +97,7 @@ export interface WebhookResult {
 
 export interface ActionResult {
   success: boolean;
-  data: Record<string, unknown>;
+  data?: Record<string, unknown>;
   error?: string;
 }
 

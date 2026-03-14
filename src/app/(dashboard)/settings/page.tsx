@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 
 interface SettingsForm {
@@ -11,15 +11,62 @@ interface SettingsForm {
   floodProtectionWindowMinutes: number;
 }
 
+interface WorkspaceData {
+  id: string;
+  name: string;
+  slug: string;
+  plan: string;
+  usedTasksThisMonth: number;
+  maxTasksPerMonth: number;
+  taskResetDate: string | null;
+  settings: {
+    errorNotificationEmail?: string | null;
+    autoReplay?: 'never' | 'always' | 'on_transient';
+    floodProtection?: {
+      maxTasksPerWindow?: number;
+      windowMinutes?: number;
+    };
+  };
+  createdAt: string;
+}
+
 export default function SettingsPage() {
   const [settings, setSettings] = useState<SettingsForm>({
-    workspaceName: 'My Workspace',
+    workspaceName: '',
     errorNotificationEmail: '',
     autoReplay: 'never',
     floodProtectionMaxTasks: 100,
     floodProtectionWindowMinutes: 10,
   });
+  const [workspaceData, setWorkspaceData] = useState<WorkspaceData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    const fetchWorkspace = async () => {
+      try {
+        const response = await fetch('/api/workspace');
+        if (!response.ok) throw new Error('Failed to fetch workspace');
+        const data = await response.json();
+        const ws: WorkspaceData = data.workspace;
+        setWorkspaceData(ws);
+        setSettings({
+          workspaceName: ws.name,
+          errorNotificationEmail: ws.settings?.errorNotificationEmail ?? '',
+          autoReplay: ws.settings?.autoReplay ?? 'never',
+          floodProtectionMaxTasks: ws.settings?.floodProtection?.maxTasksPerWindow ?? 100,
+          floodProtectionWindowMinutes: ws.settings?.floodProtection?.windowMinutes ?? 10,
+        });
+      } catch (error) {
+        console.error('Error fetching workspace:', error);
+        toast.error('Failed to load workspace settings');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchWorkspace();
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.currentTarget;
@@ -32,13 +79,17 @@ export default function SettingsPage() {
   const handleSave = async () => {
     try {
       setIsSaving(true);
-      // TODO: Implement PATCH /api/workspace endpoint
-      // const response = await fetch('/api/workspace', {
-      //   method: 'PATCH',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(settings),
-      // });
-      // if (!response.ok) throw new Error('Failed to save settings');
+      const response = await fetch('/api/workspace', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error((err as { error?: string }).error ?? 'Failed to save settings');
+      }
+      const data = await response.json();
+      setWorkspaceData(data.workspace);
       toast.success('Settings saved successfully');
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Failed to save settings';
@@ -47,6 +98,25 @@ export default function SettingsPage() {
       setIsSaving(false);
     }
   };
+
+  const planName = workspaceData
+    ? workspaceData.plan.charAt(0).toUpperCase() + workspaceData.plan.slice(1)
+    : 'Free';
+  const usedTasks = workspaceData?.usedTasksThisMonth ?? 0;
+  const maxTasks = workspaceData?.maxTasksPerMonth ?? 500;
+  const usagePercent = maxTasks > 0 ? Math.min((usedTasks / maxTasks) * 100, 100) : 0;
+
+  if (isLoading) {
+    return (
+      <div className="p-8 max-w-3xl">
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-white">Settings</h1>
+          <p className="text-gray-400 text-sm mt-1">Workspace configuration and account settings</p>
+        </div>
+        <div className="text-gray-400 text-sm">Loading workspace settings...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8 max-w-3xl">
@@ -129,17 +199,22 @@ export default function SettingsPage() {
         <h2 className="text-lg font-semibold text-white mb-4">Plan & Usage</h2>
         <div className="flex items-center justify-between mb-4">
           <div>
-            <p className="text-white font-medium">Free Plan</p>
-            <p className="text-sm text-gray-400">500 tasks / month</p>
+            <p className="text-white font-medium">{planName} Plan</p>
+            <p className="text-sm text-gray-400">{maxTasks.toLocaleString()} tasks / month</p>
           </div>
           <button className="px-4 py-2 bg-[#C9A227] text-[#0C2340] font-semibold text-sm rounded-lg hover:bg-[#D4AF37] transition-colors">
             Upgrade
           </button>
         </div>
         <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-          <div className="h-full bg-[#C9A227] rounded-full transition-all" style={{ width: '0%' }} />
+          <div
+            className="h-full bg-[#C9A227] rounded-full transition-all"
+            style={{ width: `${usagePercent}%` }}
+          />
         </div>
-        <p className="text-xs text-gray-500 mt-2">0 of 500 tasks used this month</p>
+        <p className="text-xs text-gray-500 mt-2">
+          {usedTasks.toLocaleString()} of {maxTasks.toLocaleString()} tasks used this month
+        </p>
       </section>
 
       {/* Save Button */}
