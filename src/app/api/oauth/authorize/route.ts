@@ -65,7 +65,15 @@ export async function GET(request: NextRequest) {
 
     const authorizationUrl = `${authConfig.authorizationUrl}?${params.toString()}`;
 
-    return NextResponse.redirect(authorizationUrl);
+    const redirectResponse = NextResponse.redirect(authorizationUrl);
+    redirectResponse.cookies.set('ff_oauth_nonce', statePayload.nonce, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 600,
+      path: '/',
+    });
+    return redirectResponse;
   } catch (error) {
     console.error('GET /api/oauth/authorize error:', error);
     return NextResponse.json({ error: 'Failed to initiate OAuth flow' }, { status: 500 });

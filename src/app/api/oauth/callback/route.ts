@@ -33,6 +33,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid state parameter' }, { status: 400 });
     }
 
+    const storedNonce = request.cookies.get('ff_oauth_nonce')?.value;
+    if (!storedNonce || storedNonce !== statePayload.nonce) {
+      return NextResponse.json({ error: 'Invalid OAuth state — request may have been tampered with' }, { status: 400 });
+    }
+
     const { connectorId, workspaceId, userId } = statePayload;
 
     // ── Connector lookup ──────────────────────────────────────────────────────

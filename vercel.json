@@ -3,5 +3,5 @@
   "buildCommand": "npm run build",
   "installCommand": "npm install",
   "regions": ["iad1"],
-  "crons": []
+  "crons": [{ "path": "/api/cron/scheduler", "schedule": "* * * * *" }]
 }
