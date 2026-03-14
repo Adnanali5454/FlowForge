@@ -6,7 +6,7 @@
   "author": "Syed Ali Adnan <Connect@syedaliadnan.com>",
   "license": "UNLICENSED",
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

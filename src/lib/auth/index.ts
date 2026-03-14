@@ -108,7 +108,7 @@ export const PERMISSIONS = {
 export const AUTH_COOKIE_NAME = 'ff_session';
 export const WORKSPACE_COOKIE_NAME = 'ff_workspace';
 
-export function getAuthCookieOptions(secure = true) {
+export function getAuthCookieOptions(secure = process.env.NODE_ENV === 'production') {
   return {
     httpOnly: true,
     secure,
