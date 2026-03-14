@@ -1,0 +1,125 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand-navy: #0C2340;
+  --brand-gold: #C9A227;
+  --brand-ivory: #FAF8F5;
+  --canvas-bg: #1a1a2e;
+  --canvas-surface: #16213e;
+  --canvas-border: #0f3460;
+  --sidebar-bg: #111827;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+body {
+  background: #0f0f1a;
+  color: #e5e7eb;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── React Flow Overrides ─────────────────────────────────────────────── */
+.react-flow {
+  background: var(--canvas-bg) !important;
+}
+
+.react-flow__node {
+  cursor: pointer;
+}
+
+.react-flow__edge-path {
+  stroke: #4b5563;
+  stroke-width: 2;
+}
+
+.react-flow__edge.animated .react-flow__edge-path {
+  stroke-dasharray: 5;
+  animation: dashdraw 0.5s linear infinite;
+}
+
+@keyframes dashdraw {
+  to {
+    stroke-dashoffset: -10;
+  }
+}
+
+.react-flow__connection-line {
+  stroke: var(--brand-gold) !important;
+  stroke-width: 2;
+}
+
+.react-flow__controls {
+  background: var(--canvas-surface);
+  border: 1px solid var(--canvas-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.react-flow__controls button {
+  background: var(--canvas-surface);
+  border-bottom: 1px solid var(--canvas-border);
+  color: #9ca3af;
+}
+
+.react-flow__controls button:hover {
+  background: #1f2937;
+  color: white;
+}
+
+.react-flow__minimap {
+  background: var(--canvas-surface) !important;
+  border: 1px solid var(--canvas-border);
+  border-radius: 8px;
+}
+
+/* ─── Scrollbar ────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #374151;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4b5563;
+}
+
+/* ─── Utility Classes ──────────────────────────────────────────────────── */
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .glass {
+    background: rgba(17, 24, 39, 0.8);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(75, 85, 99, 0.3);
+  }
+
+  .gold-gradient {
+    background: linear-gradient(135deg, #C9A227 0%, #D4AF37 50%, #C9A227 100%);
+  }
+
+  .navy-gradient {
+    background: linear-gradient(135deg, #0C2340 0%, #1a3a5c 100%);
+  }
+}
