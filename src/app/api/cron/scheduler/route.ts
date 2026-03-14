@@ -26,9 +26,9 @@ export async function GET(request: NextRequest) {
   let triggered = 0;
   for (const wf of scheduled) {
     try {
-      const { parseExpression } = await import('cron-parser');
+      const { CronExpressionParser } = await import('cron-parser');
       const t = wf.trigger as TriggerConfig & { config: { cron: string } };
-      const interval = parseExpression(t.config.cron, { currentDate: now });
+      const interval = CronExpressionParser.parse(t.config.cron, { currentDate: now });
       const prev = interval.prev().toDate();
       if (now.getTime() - prev.getTime() <= 65000) {
         const workflow = {

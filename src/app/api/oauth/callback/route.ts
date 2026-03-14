@@ -112,9 +112,11 @@ export async function GET(request: NextRequest) {
     });
 
     // ── Redirect to connections page ──────────────────────────────────────────
-    return NextResponse.redirect(
+    const finalResponse = NextResponse.redirect(
       `${process.env.NEXT_PUBLIC_APP_URL}/connections?connected=true`
     );
+    finalResponse.cookies.delete('ff_oauth_nonce');
+    return finalResponse;
   } catch (error) {
     console.error('GET /api/oauth/callback error:', error);
     return NextResponse.json({ error: 'OAuth callback failed' }, { status: 500 });
