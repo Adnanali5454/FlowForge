@@ -3,6 +3,7 @@
 // auth, headers, body, timeout, and redirect behavior.
 
 import type { HttpConfig } from '@/types';
+import { resolveTemplate } from '@/lib/utils';
 
 export interface HttpResult {
   statusCode: number;
@@ -72,15 +73,26 @@ export async function executeHttp(
     }
   }
 
+  // Resolve templates in URL, headers, and body using inputData
+  const flatInput = inputData as Record<string, unknown>;
+  const resolvedUrl = resolveTemplate(config.url, flatInput);
+  const resolvedHeaders: Record<string, string> = Object.fromEntries(
+    Object.entries(headers).map(([k, v]) => [k, resolveTemplate(String(v), flatInput)])
+  );
+  let resolvedBody = body;
+  if (typeof resolvedBody === 'string') {
+    resolvedBody = resolveTemplate(resolvedBody, flatInput);
+  }
+
   // Execute request
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), config.timeout || 30000);
 
   try {
-    const response = await fetch(config.url, {
+    const response = await fetch(resolvedUrl, {
       method: config.method,
-      headers,
-      body,
+      headers: resolvedHeaders,
+      body: resolvedBody,
       signal: controller.signal,
       redirect: config.followRedirects ? 'follow' : 'manual',
     });
@@ -120,7 +132,7 @@ export async function executeHttp(
         body: { error: `Request timed out after ${config.timeout || 30000}ms` },
         durationMs: Date.now() - startTime,
         redirected: false,
-        url: config.url,
+        url: resolvedUrl,
       };
     }
 
@@ -130,7 +142,7 @@ export async function executeHttp(
       body: { error: error instanceof Error ? error.message : 'Unknown error' },
       durationMs: Date.now() - startTime,
       redirected: false,
-      url: config.url,
+      url: resolvedUrl,
     };
   }
 }

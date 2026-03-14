@@ -43,7 +43,7 @@ export async function executeCode(
 
     // Wrap user code in an async function
     const wrappedCode = `
-      return (async function(inputData, console) {
+      return (async function(inputData, sandboxConsole) {
         ${config.source}
       })(inputData, sandboxConsole);
     `;

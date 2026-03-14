@@ -86,7 +86,7 @@ const BUILT_IN_SERVERS: MCPServer[] = [
         serverId: 'filesystem',
       },
     ],
-    status: 'connected',
+    status: 'disconnected',
   },
   {
     id: 'web-search',
@@ -122,7 +122,7 @@ const BUILT_IN_SERVERS: MCPServer[] = [
         serverId: 'web-search',
       },
     ],
-    status: 'connected',
+    status: 'disconnected',
   },
   {
     id: 'database',
@@ -173,7 +173,7 @@ const BUILT_IN_SERVERS: MCPServer[] = [
         serverId: 'database',
       },
     ],
-    status: 'connected',
+    status: 'disconnected',
   },
   {
     id: 'code-interpreter',
@@ -209,7 +209,7 @@ const BUILT_IN_SERVERS: MCPServer[] = [
         serverId: 'code-interpreter',
       },
     ],
-    status: 'connected',
+    status: 'disconnected',
   },
 ];
 
@@ -279,8 +279,11 @@ export class MCPRegistry {
     if (server.status !== 'connected') {
       return {
         success: false,
-        content: [],
-        error: `Server '${call.serverId}' is not connected (status: ${server.status})`,
+        content: [{
+          type: 'text' as const,
+          text: `Server '${call.serverId}' is not connected. Go to Settings → MCP to configure and connect this server.`,
+        }],
+        error: `Server '${call.serverId}' is disconnected`,
         isError: true,
       };
     }
@@ -295,12 +298,14 @@ export class MCPRegistry {
       };
     }
 
-    // Stub: return mock result based on server/tool
-    const mockText = generateMockResult(call.serverId, call.toolName, call.input);
-
     return {
-      success: true,
-      content: [{ type: 'text', text: mockText }],
+      success: false,
+      content: [{
+        type: 'text' as const,
+        text: `Server '${call.serverId}' is not connected. Go to Settings → MCP to configure and connect this server.`,
+      }],
+      error: `Server '${call.serverId}' is disconnected`,
+      isError: true,
     };
   }
 }

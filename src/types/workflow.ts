@@ -221,7 +221,7 @@ export interface HttpAuthConfig {
 
 export interface AiConfig {
   type: 'ai';
-  model: 'claude-sonnet-4-5-20250514' | 'claude-opus-4-5-20250414' | 'gpt-4o' | 'gemini-pro';
+  model: 'claude-sonnet-4-6' | 'claude-opus-4-6' | 'claude-sonnet-4-5-20250514' | 'claude-opus-4-5-20250414' | 'gpt-4o' | 'gemini-pro';
   prompt: string;
   systemPrompt: string;
   temperature: number;

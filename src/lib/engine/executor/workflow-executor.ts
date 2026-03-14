@@ -93,6 +93,7 @@ export class WorkflowExecutor {
   private context: ExecutionContext;
   private callbacks: ExecutionCallbacks;
   private credentialResolver?: (connectorId: string, workspaceId: string) => Promise<Record<string, string>>;
+  private visitedWorkflows = new Set<string>();
 
   constructor(
     workflow: WorkflowDefinition,
@@ -439,7 +440,8 @@ export class WorkflowExecutor {
         const result = await executeSubWorkflow(
           subConfig,
           this.context,
-          this.workflow.id
+          this.workflow.id,
+          this.visitedWorkflows
         );
         return {
           targetWorkflowId: result.targetWorkflowId,

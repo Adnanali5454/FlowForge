@@ -1,17 +1,123 @@
 // ─── Dynamic Webhook Handler ────────────────────────────────────────────────
 // POST /api/webhooks/[token] — Receive incoming webhook and trigger workflow
 
+import '@/lib/startup';
+import { waitUntil } from '@vercel/functions';
 import { NextRequest, NextResponse } from 'next/server';
 import { db, schema } from '@/lib/db';
 import { eq, and } from 'drizzle-orm';
 import { WorkflowExecutor } from '@/lib/engine';
 import { logAudit, getClientIpAddress } from '@/lib/audit';
+import { incrementWorkspaceTaskCount } from '@/lib/billing';
 import type { WorkflowDefinition, TriggerConfig, StepConfig, WorkflowSettings, WorkflowVariable } from '@/types';
 
 interface RouteContext {
   params: {
     token: string;
   };
+}
+
+/**
+ * Fire-and-forget function that runs the workflow after the webhook response
+ * has been returned to the caller.
+ */
+async function executeWebhookWorkflow(
+  workflow: WorkflowDefinition,
+  webhookPayload: Record<string, unknown>,
+  executionId: string,
+  workspaceId: string
+): Promise<void> {
+  try {
+    const executor = new WorkflowExecutor(workflow, webhookPayload, {
+      onStepStart: async (step) => {
+        await db.insert(schema.stepExecutions).values({
+          executionId,
+          stepId: step.stepId,
+          stepIndex: step.stepIndex,
+          stepType: step.stepType,
+          stepName: step.stepName,
+          status: 'running',
+          inputData: step.inputData,
+          outputData: null,
+          error: null,
+          retryCount: step.retryCount,
+          startedAt: step.startedAt,
+          completedAt: null,
+          durationMs: null,
+        });
+      },
+      onStepComplete: async (step) => {
+        // UPDATE the existing row with final status
+        await db.update(schema.stepExecutions)
+          .set({
+            status: step.status,
+            outputData: step.outputData ?? null,
+            error: step.error ?? null,
+            completedAt: step.completedAt ?? new Date(),
+            durationMs: step.durationMs ?? 0,
+            retryCount: step.retryCount ?? 0,
+          })
+          .where(
+            and(
+              eq(schema.stepExecutions.executionId, executionId),
+              eq(schema.stepExecutions.stepId, step.stepId)
+            )
+          );
+      },
+      onStepError: async (step, _error) => {
+        // UPDATE the existing row with error status
+        await db.update(schema.stepExecutions)
+          .set({
+            status: step.status,
+            outputData: step.outputData ?? null,
+            error: step.error ?? null,
+            completedAt: step.completedAt ?? new Date(),
+            durationMs: step.durationMs ?? 0,
+            retryCount: step.retryCount ?? 0,
+          })
+          .where(
+            and(
+              eq(schema.stepExecutions.executionId, executionId),
+              eq(schema.stepExecutions.stepId, step.stepId)
+            )
+          );
+      },
+    });
+
+    const result = await executor.execute();
+
+    // Update execution record with final status
+    await db
+      .update(schema.workflowExecutions)
+      .set({
+        status: result.status,
+        stepsExecuted: result.stepsExecuted,
+        error: result.error,
+        outputData: executor.toJSON().steps,
+        completedAt: result.completedAt,
+        durationMs: result.completedAt
+          ? result.completedAt.getTime() - result.startedAt.getTime()
+          : null,
+      })
+      .where(eq(schema.workflowExecutions.id, executionId));
+
+    // Atomically increment workspace task count
+    await incrementWorkspaceTaskCount(workspaceId);
+  } catch (error) {
+    console.error(`Error executing webhook workflow ${workflow.id}:`, error);
+    // Update execution with error
+    await db
+      .update(schema.workflowExecutions)
+      .set({
+        status: 'error',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        completedAt: new Date(),
+      })
+      .where(eq(schema.workflowExecutions.id, executionId))
+      .catch(() => {
+        // Silently fail on DB error
+      });
+  }
 }
 
 /**
@@ -33,32 +139,24 @@ export async function POST(
       );
     }
 
-    // Validate content type
-    const contentType = request.headers.get('content-type');
-    if (contentType && !contentType.includes('application/json')) {
-      return NextResponse.json(
-        { error: 'Content-Type must be application/json' },
-        { status: 400 }
-      );
-    }
-
-    // Parse request body
+    // Parse request body — accept JSON, form-urlencoded, or raw text
     let webhookPayload: Record<string, unknown> = {};
     try {
       const text = await request.text();
-      // Check size limit (10MB)
       if (text.length > 10 * 1024 * 1024) {
-        return NextResponse.json(
-          { error: 'Request body too large (max 10MB)' },
-          { status: 413 }
-        );
+        return NextResponse.json({ error: 'Payload too large (max 10MB)' }, { status: 413 });
       }
-      webhookPayload = text ? JSON.parse(text) : {};
+      try {
+        webhookPayload = JSON.parse(text) as Record<string, unknown>;
+      } catch {
+        try {
+          webhookPayload = Object.fromEntries(new URLSearchParams(text).entries());
+        } catch {
+          webhookPayload = { rawBody: text };
+        }
+      }
     } catch {
-      return NextResponse.json(
-        { error: 'Invalid JSON' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Failed to read request body' }, { status: 400 });
     }
 
     // Look up webhook token in workflowStorage
@@ -92,6 +190,14 @@ export async function POST(
       return NextResponse.json(
         { error: 'Workflow not found' },
         { status: 404 }
+      );
+    }
+
+    // [29] Status guard — reject paused/archived workflows
+    if (workflowRow.status === 'paused' || workflowRow.status === 'archived') {
+      return NextResponse.json(
+        { error: `Workflow is ${workflowRow.status} and cannot be executed` },
+        { status: 409 }
       );
     }
 
@@ -138,114 +244,8 @@ export async function POST(
       ipAddress
     );
 
-    // Fire-and-forget: Execute workflow asynchronously without awaiting
-    // Use Promise.catch to prevent unhandled rejection warnings
-    (async () => {
-      try {
-        const executor = new WorkflowExecutor(workflow, webhookPayload, {
-          onStepComplete: async (step) => {
-            // Log step execution to DB
-            await db.insert(schema.stepExecutions).values({
-              executionId: executionRow.id,
-              stepId: step.stepId,
-              stepIndex: step.stepIndex,
-              stepType: step.stepType,
-              stepName: step.stepName,
-              status: step.status,
-              inputData: step.inputData,
-              outputData: step.outputData,
-              error: step.error,
-              retryCount: step.retryCount,
-              startedAt: step.startedAt,
-              completedAt: step.completedAt,
-              durationMs: step.durationMs,
-            });
-          },
-          onStepError: async (step, _error) => {
-            // Log step error to DB
-            await db.insert(schema.stepExecutions).values({
-              executionId: executionRow.id,
-              stepId: step.stepId,
-              stepIndex: step.stepIndex,
-              stepType: step.stepType,
-              stepName: step.stepName,
-              status: step.status,
-              inputData: step.inputData,
-              outputData: step.outputData,
-              error: step.error,
-              retryCount: step.retryCount,
-              startedAt: step.startedAt,
-              completedAt: step.completedAt,
-              durationMs: step.durationMs,
-            });
-          },
-        });
-
-        const result = await executor.execute();
-
-        // Update execution record with final status
-        await db
-          .update(schema.workflowExecutions)
-          .set({
-            status: result.status,
-            stepsExecuted: result.stepsExecuted,
-            error: result.error,
-            outputData: executor.toJSON().steps,
-            completedAt: result.completedAt,
-            durationMs: result.completedAt
-              ? result.completedAt.getTime() - result.startedAt.getTime()
-              : null,
-          })
-          .where(eq(schema.workflowExecutions.id, executionRow.id));
-
-        // Update workspace task count (increment by 1 for webhook execution)
-        const workspace = await db
-          .select()
-          .from(schema.workspaces)
-          .where(eq(schema.workspaces.id, workspaceId));
-
-        if (workspace.length > 0) {
-          const ws = workspace[0];
-          const taskResetDate = ws.taskResetDate ? new Date(ws.taskResetDate) : null;
-          const now = new Date();
-          const currentMonth = now.toISOString().slice(0, 7); // YYYY-MM
-          const resetMonth = taskResetDate ? taskResetDate.toISOString().slice(0, 7) : null;
-
-          let newUsedTasks = (ws.usedTasksThisMonth || 0) + 1;
-          let newResetDate = taskResetDate;
-
-          // Reset if month has changed
-          if (!resetMonth || resetMonth !== currentMonth) {
-            newUsedTasks = 1;
-            newResetDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-          }
-
-          await db
-            .update(schema.workspaces)
-            .set({
-              usedTasksThisMonth: newUsedTasks,
-              taskResetDate: newResetDate,
-            })
-            .where(eq(schema.workspaces.id, workspaceId));
-        }
-      } catch (error) {
-        console.error(`Error executing webhook workflow ${workflowId}:`, error);
-        // Update execution with error
-        await db
-          .update(schema.workflowExecutions)
-          .set({
-            status: 'error',
-            error: error instanceof Error ? error.message : 'Unknown error',
-            completedAt: new Date(),
-          })
-          .where(eq(schema.workflowExecutions.id, executionRow.id))
-          .catch(() => {
-            // Silently fail on DB error
-          });
-      }
-    })().catch(() => {
-      // Prevent unhandled rejection
-    });
+    // [27] Use waitUntil to run workflow execution after response is sent
+    waitUntil(executeWebhookWorkflow(workflow, webhookPayload, executionRow.id, workspaceId));
 
     // Return 200 immediately
     return NextResponse.json(

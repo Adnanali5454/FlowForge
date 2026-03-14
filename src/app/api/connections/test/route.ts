@@ -51,21 +51,42 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Connection not found' }, { status: 404 });
     }
 
-    // In a real implementation, you would call the connector's testConnection method
-    // For now, we'll just update the lastTestedAt timestamp
     const conn = connection[0];
 
-    // Update lastTestedAt timestamp
-    await db
-      .update(schema.appConnections)
-      .set({ lastTestedAt: new Date() })
+    // Look up connector slug from registry
+    const [registry] = await db.select({ slug: schema.connectorRegistry.slug })
+      .from(schema.connectorRegistry)
+      .where(eq(schema.connectorRegistry.id, conn.connectorId));
+
+    // Try to get the connector implementation
+    const { getConnector } = await import('@/lib/connectors/base');
+    const connector = registry ? getConnector(registry.slug) : null;
+
+    let isValid = false;
+    let message = 'Connection verified';
+
+    if (connector && typeof connector.testConnection === 'function') {
+      try {
+        const creds = (typeof conn.credentials === 'string'
+          ? JSON.parse(conn.credentials)
+          : conn.credentials) as Record<string, string>;
+        isValid = await connector.testConnection(creds);
+        message = isValid ? 'Connection verified successfully' : 'Connection test failed — check your credentials';
+      } catch {
+        isValid = false;
+        message = 'Connection test failed';
+      }
+    } else {
+      // No test implementation — mark as valid (benefit of the doubt)
+      isValid = true;
+      message = 'Connection saved (no automated test available for this connector)';
+    }
+
+    await db.update(schema.appConnections)
+      .set({ isValid, lastTestedAt: new Date() })
       .where(eq(schema.appConnections.id, connectionId));
 
-    return NextResponse.json({
-      success: true,
-      message: 'Connection test passed',
-      connectorId: conn.connectorId,
-    });
+    return NextResponse.json({ success: isValid, message });
   } catch (error) {
     console.error('POST /api/connections/test error:', error);
     return NextResponse.json(

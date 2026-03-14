@@ -323,7 +323,7 @@ describe('WorkflowExecutor — basic execution', () => {
 
     expect(onExecutionComplete).toHaveBeenCalledOnce();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const state = (onExecutionComplete.mock.calls as any)[0][0];
+    const state = (onExecutionComplete.mock.calls as unknown as any[][])[0]![0];
     expect(state.status).toBe('success');
   });
 

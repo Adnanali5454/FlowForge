@@ -21,7 +21,7 @@ export async function POST(request: NextRequest, { params }: { params: { chatbot
 
     const model = chatbot.model === 'gpt-4o'
       ? 'gpt-4o'
-      : 'claude-sonnet-4-5-20250514';
+      : 'claude-sonnet-4-6';
 
     const isOpenAI = chatbot.model.startsWith('gpt');
 
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest, { params }: { params: { chatbot
           'content-type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-5-20250514',
+          model: 'claude-sonnet-4-6',
           max_tokens: 1024,
           system: chatbot.systemPrompt || 'You are a helpful assistant.',
           messages,

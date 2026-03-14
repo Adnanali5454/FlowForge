@@ -1,79 +1,61 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { db, schema } from '@/lib/db';
+import { and, eq } from 'drizzle-orm';
+import { verifyToken, AUTH_COOKIE_NAME } from '@/lib/auth';
 
-interface Approval {
-  id: string;
-  workflowName: string;
-  stepName: string;
-  requestor: {
-    name: string;
-    email: string;
-    avatar: string;
-  };
-  requestedAt: string;
-  priority: 'high' | 'medium' | 'low';
-  context: Record<string, string>;
-}
+export async function GET(request: NextRequest) {
+  const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
+  if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const session = await verifyToken(token);
+  if (!session?.workspaceId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-const MOCK_APPROVALS: Approval[] = [
-  {
-    id: 'appr-001',
-    workflowName: 'Finance Automation',
-    stepName: 'Approve Payment Transfer',
-    requestor: { name: 'Sarah Chen', email: 'sarah@acme.com', avatar: 'SC' },
-    requestedAt: new Date(Date.now() - 12 * 60 * 1000).toISOString(),
-    priority: 'high',
-    context: { Amount: '$4,200.00', Recipient: 'Acme Corp', Account: '****4892', Reference: 'INV-2026-0441' },
-  },
-  {
-    id: 'appr-002',
-    workflowName: 'User Offboarding',
-    stepName: 'Confirm User Deletion',
-    requestor: { name: 'Alex Johnson', email: 'alex@acme.com', avatar: 'AJ' },
-    requestedAt: new Date(Date.now() - 34 * 60 * 1000).toISOString(),
-    priority: 'high',
-    context: { User: 'john.doe@acme.com', Department: 'Engineering', 'Data Retention': '90 days', 'Access Revoked': 'Pending' },
-  },
-  {
-    id: 'appr-003',
-    workflowName: 'Marketing Campaign',
-    stepName: 'Authorize Bulk Email Send',
-    requestor: { name: 'Marcus Rivera', email: 'marcus@acme.com', avatar: 'MR' },
-    requestedAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
-    priority: 'medium',
-    context: { Recipients: '42,300 contacts', Campaign: 'Spring Product Launch', Scheduled: 'Mar 15, 2026 09:00 AM', Subject: 'Introducing FlowForge 2.0' },
-  },
-  {
-    id: 'appr-004',
-    workflowName: 'Legal Workflow',
-    stepName: 'Sign Contract',
-    requestor: { name: 'Priya Patel', email: 'priya@acme.com', avatar: 'PP' },
-    requestedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    priority: 'medium',
-    context: { Contract: 'Vendor Agreement v3.pdf', Value: '$120,000/yr', Counterparty: 'TechVendor Inc.', Expires: 'Mar 20, 2026' },
-  },
-];
+  const records = await db.select().from(schema.workflowStorage)
+    .where(and(
+      eq(schema.workflowStorage.workspaceId, session.workspaceId),
+      eq(schema.workflowStorage.namespace, 'hitl_requests')
+    ));
 
-export async function GET() {
-  return NextResponse.json({ approvals: MOCK_APPROVALS });
+  const approvals = records
+    .map(r => { try { return JSON.parse(r.value as string); } catch { return null; } })
+    .filter(Boolean)
+    .filter((a: Record<string, unknown>) => a.status === 'pending');
+
+  return NextResponse.json({ approvals });
 }
 
 export async function POST(request: NextRequest) {
-  const body = await request.json() as { approvalId?: string; action?: string; comment?: string };
-  const { approvalId, action, comment } = body;
+  const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
+  if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const session = await verifyToken(token);
+  if (!session?.workspaceId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  if (!approvalId || !action) {
-    return NextResponse.json({ error: 'approvalId and action are required' }, { status: 400 });
+  const body = await request.json();
+  const { approvalId, action, comment } = body as { approvalId: string; action: 'approve' | 'reject'; comment?: string };
+
+  const [record] = await db.select().from(schema.workflowStorage)
+    .where(and(
+      eq(schema.workflowStorage.key, approvalId),
+      eq(schema.workflowStorage.namespace, 'hitl_requests'),
+      eq(schema.workflowStorage.workspaceId, session.workspaceId)
+    ));
+
+  if (!record) return NextResponse.json({ error: 'Approval not found' }, { status: 404 });
+
+  let data: Record<string, unknown>;
+  try { data = JSON.parse(record.value as string); } catch { return NextResponse.json({ error: 'Invalid approval data' }, { status: 500 }); }
+
+  const decidedAt = new Date().toISOString();
+  const updated = { ...data, status: action, decidedAt, comment: comment ?? null };
+
+  await db.update(schema.workflowStorage)
+    .set({ value: JSON.stringify(updated) })
+    .where(eq(schema.workflowStorage.key, approvalId));
+
+  if (data.executionId && action === 'approve') {
+    await db.update(schema.workflowExecutions)
+      .set({ status: 'running' })
+      .where(eq(schema.workflowExecutions.id, data.executionId as string));
   }
 
-  if (action !== 'approve' && action !== 'reject') {
-    return NextResponse.json({ error: 'action must be "approve" or "reject"' }, { status: 400 });
-  }
-
-  return NextResponse.json({
-    success: true,
-    approvalId,
-    action,
-    comment: comment ?? null,
-    decidedAt: new Date().toISOString(),
-  });
+  return NextResponse.json({ success: true, approvalId, action, decidedAt });
 }

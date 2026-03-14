@@ -113,6 +113,8 @@ export async function executeAi(
 
   try {
     switch (config.model) {
+      case 'claude-sonnet-4-6':
+      case 'claude-opus-4-6':
       case 'claude-sonnet-4-5-20250514':
       case 'claude-opus-4-5-20250414':
         return await executeAnthropicAi(

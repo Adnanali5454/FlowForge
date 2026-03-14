@@ -19,22 +19,20 @@ export interface SubWorkflowResult {
   durationMs: number;
 }
 
-// Track active workflow IDs to prevent circular references
-const activeWorkflows = new Set<string>();
-
 /**
  * Execute a sub-workflow step.
  */
 export async function executeSubWorkflow(
   config: SubWorkflowConfig,
   context: ExecutionContext,
-  currentWorkflowId: string
+  currentWorkflowId: string,
+  visitedWorkflows: Set<string> = new Set()
 ): Promise<SubWorkflowResult> {
   const startTime = Date.now();
   const { targetWorkflowId, inputMapping, waitForCompletion } = config;
 
   // Check for circular reference
-  if (activeWorkflows.has(targetWorkflowId)) {
+  if (visitedWorkflows.has(targetWorkflowId)) {
     throw new Error(
       `Circular workflow reference detected: ${currentWorkflowId} -> ${targetWorkflowId}`
     );
@@ -73,8 +71,8 @@ export async function executeSubWorkflow(
   // Resolve input mappings to get trigger data for the sub-workflow
   const triggerData = resolveInputMappings(inputMapping, context);
 
-  // Mark workflow as active to detect circular refs
-  activeWorkflows.add(targetWorkflowId);
+  // Mark workflow as visited to detect circular refs
+  visitedWorkflows.add(targetWorkflowId);
 
   try {
     // Create and execute the sub-workflow
@@ -104,7 +102,7 @@ export async function executeSubWorkflow(
       durationMs: Date.now() - startTime,
     };
   } finally {
-    // Always remove from active workflows
-    activeWorkflows.delete(targetWorkflowId);
+    // Always remove from visited workflows
+    visitedWorkflows.delete(targetWorkflowId);
   }
 }
