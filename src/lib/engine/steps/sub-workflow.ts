@@ -90,25 +90,34 @@ export async function executeSubWorkflow(
     if (waitForCompletion) {
       // Wait for completion
       executionState = await executor.execute();
-    } else {
-      // Start async execution but don't wait
-      // For now, we'll still wait since we need results
-      // A true async implementation would queue the execution
-      executionState = await executor.execute();
-    }
-
-    return {
-      targetWorkflowId,
-      executionId: executionState.id,
-      status: executionState.status,
-      stepsExecuted: executionState.stepsExecuted,
-      error: executionState.error,
-      output: {
-        triggerData: executionState.triggerData,
+      return {
+        targetWorkflowId,
+        executionId: executionState.id,
+        status: executionState.status,
         stepsExecuted: executionState.stepsExecuted,
-      },
-      durationMs: Date.now() - startTime,
-    };
+        error: executionState.error,
+        output: {
+          triggerData: executionState.triggerData,
+          stepsExecuted: executionState.stepsExecuted,
+        },
+        durationMs: Date.now() - startTime,
+      };
+    } else {
+      // Fire-and-forget: kick off execution without blocking the parent
+      const fireAndForgetId = `async-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      void executor.execute().catch((err) => {
+        console.error(`[sub-workflow] fire-and-forget execution ${fireAndForgetId} failed:`, err);
+      });
+      return {
+        targetWorkflowId,
+        executionId: fireAndForgetId,
+        status: 'running',
+        stepsExecuted: 0,
+        error: null,
+        output: { async: true },
+        durationMs: Date.now() - startTime,
+      };
+    }
   } finally {
     // Always remove from visited workflows
     visitedWorkflows.delete(targetWorkflowId);

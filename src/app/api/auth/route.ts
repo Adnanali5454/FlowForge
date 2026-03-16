@@ -2,6 +2,25 @@
 // POST /api/auth — Login / Register / Logout
 
 import { NextRequest, NextResponse } from 'next/server';
+
+// ── Simple in-memory rate limiter (per IP) ──────────────────────────────────
+// Limits auth endpoints to 10 requests per minute per IP.
+// Note: does not persist across serverless instances — adds basic protection.
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_MAX = 10;
+const RATE_LIMIT_WINDOW_MS = 60_000;
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  if (entry.count >= RATE_LIMIT_MAX) return false;
+  entry.count++;
+  return true;
+}
 import { db, schema } from '@/lib/db';
 import { eq } from 'drizzle-orm';
 import {
@@ -15,9 +34,19 @@ import { logAudit, getClientIpAddress } from '@/lib/audit';
 
 export async function POST(request: NextRequest) {
   try {
+    const ipAddress = getClientIpAddress(request.headers);
+
+    // Rate-limit auth endpoints to prevent brute-force attacks
+    const ip = ipAddress ?? 'unknown';
+    if (!checkRateLimit(ip)) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again in a minute.' },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const { action } = body;
-    const ipAddress = getClientIpAddress(request.headers);
 
     switch (action) {
       case 'register':
