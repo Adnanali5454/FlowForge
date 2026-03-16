@@ -112,7 +112,6 @@ export default function WorkflowCanvas() {
         maxZoom={2}
         defaultViewport={{ x: 0, y: 0, zoom: 1 }}
         attributionPosition="bottom-left"
-        proOptions={{ hideAttribution: true }}
       >
         <Background
           variant={BackgroundVariant.Dots}

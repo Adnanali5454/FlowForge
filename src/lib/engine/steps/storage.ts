@@ -62,7 +62,7 @@ async function storageSet(
     .from(schema.workflowStorage)
     .where(
       and(
-        eq(schema.workflowStorage.workspaceId, workspaceId as never),
+        eq(schema.workflowStorage.workspaceId, workspaceId as string),
         eq(schema.workflowStorage.namespace, namespace),
         eq(schema.workflowStorage.key, key)
       )
@@ -81,7 +81,7 @@ async function storageSet(
       })
       .where(
         and(
-          eq(schema.workflowStorage.workspaceId, workspaceId as never),
+          eq(schema.workflowStorage.workspaceId, workspaceId as string),
           eq(schema.workflowStorage.namespace, namespace),
           eq(schema.workflowStorage.key, key)
         )
@@ -89,7 +89,7 @@ async function storageSet(
   } else {
     // Insert new
     await db.insert(schema.workflowStorage).values({
-      workspaceId: workspaceId as never,
+      workspaceId: workspaceId as string,
       namespace,
       key,
       value,
@@ -119,7 +119,7 @@ async function storageGet(
     .from(schema.workflowStorage)
     .where(
       and(
-        eq(schema.workflowStorage.workspaceId, workspaceId as never),
+        eq(schema.workflowStorage.workspaceId, workspaceId as string),
         eq(schema.workflowStorage.namespace, namespace),
         eq(schema.workflowStorage.key, key)
       )
@@ -150,7 +150,7 @@ async function storageIncrement(
     .from(schema.workflowStorage)
     .where(
       and(
-        eq(schema.workflowStorage.workspaceId, workspaceId as never),
+        eq(schema.workflowStorage.workspaceId, workspaceId as string),
         eq(schema.workflowStorage.namespace, namespace),
         eq(schema.workflowStorage.key, key)
       )
@@ -171,7 +171,7 @@ async function storageIncrement(
       })
       .where(
         and(
-          eq(schema.workflowStorage.workspaceId, workspaceId as never),
+          eq(schema.workflowStorage.workspaceId, workspaceId as string),
           eq(schema.workflowStorage.namespace, namespace),
           eq(schema.workflowStorage.key, key)
         )
@@ -179,7 +179,7 @@ async function storageIncrement(
   } else {
     // Insert
     await db.insert(schema.workflowStorage).values({
-      workspaceId: workspaceId as never,
+      workspaceId: workspaceId as string,
       namespace,
       key,
       value: newValue,
@@ -210,7 +210,7 @@ async function storageDecrement(
     .from(schema.workflowStorage)
     .where(
       and(
-        eq(schema.workflowStorage.workspaceId, workspaceId as never),
+        eq(schema.workflowStorage.workspaceId, workspaceId as string),
         eq(schema.workflowStorage.namespace, namespace),
         eq(schema.workflowStorage.key, key)
       )
@@ -231,7 +231,7 @@ async function storageDecrement(
       })
       .where(
         and(
-          eq(schema.workflowStorage.workspaceId, workspaceId as never),
+          eq(schema.workflowStorage.workspaceId, workspaceId as string),
           eq(schema.workflowStorage.namespace, namespace),
           eq(schema.workflowStorage.key, key)
         )
@@ -239,7 +239,7 @@ async function storageDecrement(
   } else {
     // Insert
     await db.insert(schema.workflowStorage).values({
-      workspaceId: workspaceId as never,
+      workspaceId: workspaceId as string,
       namespace,
       key,
       value: newValue,
@@ -270,7 +270,7 @@ async function storageDelete(
     .from(schema.workflowStorage)
     .where(
       and(
-        eq(schema.workflowStorage.workspaceId, workspaceId as never),
+        eq(schema.workflowStorage.workspaceId, workspaceId as string),
         eq(schema.workflowStorage.namespace, namespace),
         eq(schema.workflowStorage.key, key)
       )
@@ -284,7 +284,7 @@ async function storageDelete(
     .delete(schema.workflowStorage)
     .where(
       and(
-        eq(schema.workflowStorage.workspaceId, workspaceId as never),
+        eq(schema.workflowStorage.workspaceId, workspaceId as string),
         eq(schema.workflowStorage.namespace, namespace),
         eq(schema.workflowStorage.key, key)
       )
@@ -311,7 +311,7 @@ async function storageList(
     .from(schema.workflowStorage)
     .where(
       and(
-        eq(schema.workflowStorage.workspaceId, workspaceId as never),
+        eq(schema.workflowStorage.workspaceId, workspaceId as string),
         eq(schema.workflowStorage.namespace, namespace)
       )
     );

@@ -58,7 +58,7 @@ async function digestAppend(
 
   // Insert into digest entries
   await db.insert(schema.digestEntries).values({
-    workspaceId: workspaceId as never,
+    workspaceId: workspaceId as string,
     digestKey,
     data: dataToStore,
     createdAt: new Date(),
@@ -86,7 +86,7 @@ async function digestRelease(
     .from(schema.digestEntries)
     .where(
       and(
-        eq(schema.digestEntries.workspaceId, workspaceId as never),
+        eq(schema.digestEntries.workspaceId, workspaceId as string),
         eq(schema.digestEntries.digestKey, digestKey)
       )
     );
@@ -96,7 +96,7 @@ async function digestRelease(
     .delete(schema.digestEntries)
     .where(
       and(
-        eq(schema.digestEntries.workspaceId, workspaceId as never),
+        eq(schema.digestEntries.workspaceId, workspaceId as string),
         eq(schema.digestEntries.digestKey, digestKey)
       )
     );

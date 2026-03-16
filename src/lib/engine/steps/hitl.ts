@@ -48,7 +48,7 @@ export async function executeHitl(
   await db
     .insert(schema.workflowStorage)
     .values({
-      workspaceId: workspaceId as never,
+      workspaceId: workspaceId as string,
       namespace: 'hitl_requests',
       key: approvalId,
       value: JSON.stringify(approvalData),

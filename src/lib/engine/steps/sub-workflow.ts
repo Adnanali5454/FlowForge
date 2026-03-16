@@ -2,7 +2,15 @@
 // Executes another workflow by ID with input mapping and wait-for-completion.
 // Includes circular reference detection.
 
-import type { SubWorkflowConfig, WorkflowDefinition } from '@/types';
+import type {
+  SubWorkflowConfig,
+  WorkflowDefinition,
+  WorkflowStatus,
+  WorkflowVariable,
+  WorkflowSettings,
+  TriggerConfig,
+  StepConfig,
+} from '@/types';
 import { db, schema } from '@/lib/db';
 import { eq } from 'drizzle-orm';
 import { WorkflowExecutor, type ExecutionState } from '../executor/workflow-executor';
@@ -42,7 +50,7 @@ export async function executeSubWorkflow(
   const workflowRow = await db
     .select()
     .from(schema.workflowDefinitions)
-    .where(eq(schema.workflowDefinitions.id, targetWorkflowId as never))
+    .where(eq(schema.workflowDefinitions.id, targetWorkflowId as string))
     .limit(1);
 
   if (workflowRow.length === 0) {
@@ -55,17 +63,17 @@ export async function executeSubWorkflow(
     workspaceId: workflowData.workspaceId,
     name: workflowData.name,
     description: workflowData.description,
-    status: workflowData.status as never,
+    status: workflowData.status as WorkflowStatus,
     version: workflowData.version,
-    trigger: workflowData.trigger as never,
-    steps: workflowData.steps as never,
-    variables: workflowData.variables as never,
-    settings: workflowData.settings as never,
+    trigger: workflowData.trigger as TriggerConfig,
+    steps: workflowData.steps as StepConfig[],
+    variables: workflowData.variables as Record<string, WorkflowVariable>,
+    settings: workflowData.settings as WorkflowSettings,
     createdAt: workflowData.createdAt.toISOString(),
     updatedAt: workflowData.updatedAt.toISOString(),
     createdBy: workflowData.createdBy,
     folderId: workflowData.folderId,
-    tags: workflowData.tags as never,
+    tags: workflowData.tags as string[],
   };
 
   // Resolve input mappings to get trigger data for the sub-workflow
